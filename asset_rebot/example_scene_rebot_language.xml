@@ -1,0 +1,27 @@
+<mujoco model="reBot language tabletop task">
+  <size memory="500M"/>
+  <include file="../asset/tabletop/object/floor_isaac_style.xml"/>
+  <include file="../asset/tabletop/object/object_table.xml"/>
+  <include file="reBot-DevArm_gripper_tactile.xml"/>
+  <include file="../asset/objaverse/mug_5/model_new.xml"/>
+  <include file="../asset/objaverse/plate_11/model_new.xml"/>
+  <include file="../asset/objaverse/mug_6/model_new.xml"/>
+
+  <actuator>
+<!--    <position name="actuator_joint1" joint="joint1" kp="900" forcerange="-150 150"/>-->
+<!--    <position name="actuator_joint2" joint="joint2" kp="900" forcerange="-150 150"/>-->
+<!--    <position name="actuator_joint3" joint="joint3" kp="900" forcerange="-150 150"/>-->
+<!--    <position name="actuator_joint4" joint="joint4" kp="600" forcerange="-100 100"/>-->
+<!--    <position name="actuator_joint5" joint="joint5" kp="600" forcerange="-100 100"/>-->
+<!--    <position name="actuator_joint6" joint="joint6" kp="600" forcerange="-100 100"/>-->
+<!--    <position name="gripper" joint="left_finger" class="finger" forcerange="-100 100"/>-->
+    <position name="actuator_joint1" ctrllimited="true" ctrlrange="-1.87 1.87" joint="joint1" kp="900" forcerange="-150 150" forcelimited="true"/>
+    <position name="actuator_joint2" ctrllimited="true" ctrlrange="-3.14 0" joint="joint2" kp="900" forcerange="-150 150" forcelimited="true"/>
+    <position name="actuator_joint3" ctrllimited="true" ctrlrange="-3.14 0" joint="joint3" kp="900" forcerange="-150 150" forcelimited="true"/>
+    <position name="actuator_joint4" ctrllimited="true" ctrlrange="-1.87 1.57" joint="joint4" kp="600" forcerange="-100 100" forcelimited="true"/>
+    <position name="actuator_joint5" ctrllimited="true" ctrlrange="-1.57 1.57" joint="joint5" kp="600" forcerange="-100 100" forcelimited="true"/>
+    <position name="actuator_joint6" ctrllimited="true" ctrlrange="-3.14 3.14" joint="joint6" kp="600" forcerange="-100 100" forcelimited="true"/>
+    <position name="gripper" joint="left_finger" class="finger" forcerange="-100 100" forcelimited="true"/>
+  </actuator>
+
+</mujoco>

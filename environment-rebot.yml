@@ -1,0 +1,28 @@
+# Lightweight Conda environment for lerobot-mujoco-tutorial.
+# Project packages are intentionally installed later with pip from
+# requirements-rebot.txt, so Conda only needs to solve three small packages.
+# NVIDIA driver 535.183.01 supports up to CUDA 12.2; commands.txt therefore
+# installs the backward-compatible cu118 build required by Torch 2.6.
+#
+# Create/update:
+#   conda env create -f environment-rebot.yml
+#   conda env update -n lerobot_rebot --file environment-rebot.yml --prune
+# Activate:
+#   conda activate lerobot_rebot
+
+name: lerobot_rebot
+# Do not leak packages from ~/.local or ROS workspaces into this environment.
+variables:
+  PYTHONNOUSERSITE: "1"
+  PYTHONPATH: ""
+channels:
+  # Use one channel only. The local Conda configuration mixes conda-forge,
+  # defaults and mirrors with the classic solver, which makes repodata solving
+  # unnecessarily slow. All Conda-level packages below exist in this channel.
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+  - nodefaults
+
+dependencies:
+  - python=3.10
+  - pip>=24
+  - tk

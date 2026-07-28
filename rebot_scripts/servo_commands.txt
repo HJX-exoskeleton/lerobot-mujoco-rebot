@@ -1,0 +1,23 @@
+
+++++++++++++++++++++++++++++++++++++ Python 代码部分 +++++++++++++++++++++++++++++++++++++
+
+cd /rebotArm_policy_learning/act/rebot_scripts/Servo_control
+
+# 恢复初始位置
+python home_servo.py  # 舵机臂
+python home_rebot.py  # 达妙臂
+
+# 手动拖动舵机进行主从遥操作
+python servo_arm_teleoperation_real.py --xml /home/hjx/hjx_file/rebot_devarm_ws/rebotArm_policy_learning/act/assets/rebotarm_sim_cupboard.xml --port /dev/ttyUSB0 --baudrate 115200 --rate 50 --read-rate 60 --calibrate-current-as-master
+
+# 数据采集
+python record_rebot_episodes.py --xml /home/hjx/hjx_file/rebot_devarm_ws/rebotArm_policy_learning/act/assets/rebotarm_sim_cupboard.xml --port /dev/ttyUSB0 --baudrate 115200 --rate 50 --read-rate 60 --calibrate-current-as-master --task_name rebot_real_test --save_dir /media/hjx/PSSD/hjx_ws/data/rebot/data_real --episode_len 1000 --episode_idx 0
+
+# 轨迹重播
+python replay_rebot_episodes.py --dataset /media/hjx/PSSD/hjx_ws/data/rebot/data_real/rebot_real_test/episode_0.hdf5
+
+++++++++++++++++++++++++++++++++++++ Python 代码部分 +++++++++++++++++++++++++++++++++++++
+
+分段任务的sh脚本运行案例：
+./auto_replay_demo.sh
+

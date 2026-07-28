@@ -1,0 +1,13 @@
+lerobot
+demo_data
+demo_data_language
+ckpt
+asset/objaverse/plate_11
+omy_pnp
+.venv
+wandb
+models/
+omy_pnp_language
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/

@@ -1,0 +1,119 @@
+进入工程目录：
+cd /media/hjx/新加卷/hjx_ws/lerobot-mujoco-rebot
+
+查看ACT真机采集参数（不连接或控制真机）：
+python -m rebot_act_real.workflow.collect --help
+
+运行多模态数据契约测试：
+python -m pytest -q rebot_act_real/tests/test_data_contract.py
+
+首次硬件测试：采集1条100帧短轨迹（50Hz下约2秒）：
+python -m rebot_act_real.workflow.collect --repo-id rebot_real/rebot_act_banana --root ./data_act_real/rebot_act_banana --task rebot_real_banana --xml asset_rebot/reBot-DevArm_gripper.xml --cfg rebot_act_real/workflow/config/arm.yaml --gripper-cfg rebot_act_real/workflow/config/gripper.yaml --port /dev/ttyUSB0 --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --rate 50 --dataset-fps 50 --episode_len 100 --episodes 1
+
+正式追加采集20条轨迹：
+python -m rebot_act_real.workflow.collect --repo-id rebot_real/rebot_act_banana --root ./data_act_real/rebot_act_banana --task rebot_real_banana --xml asset_rebot/reBot-DevArm_gripper.xml --cfg rebot_act_real/workflow/config/arm.yaml --gripper-cfg rebot_act_real/workflow/config/gripper.yaml --port /dev/ttyUSB0 --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --rate 50 --dataset-fps 50 --episode_len 800 --episodes 20
+
+覆盖旧数据集并重新采集20条（会永久删除--root指向的已有LeRobot数据集）：
+python -m rebot_act_real.workflow.collect --repo-id rebot_real/rebot_act_banana --root ./data_act_real/rebot_act_banana --task rebot_real_banana --xml asset_rebot/reBot-DevArm_gripper.xml --cfg rebot_act_real/workflow/config/arm.yaml --gripper-cfg rebot_act_real/workflow/config/gripper.yaml --port /dev/ttyUSB0 --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --rate 50 --dataset-fps 50 --episode_len 800 --episodes 20 --overwrite-dataset
+
+采集操作：
+Enter：开始录制
+s：当前episode采满且后台处理完成后保存
+d：丢弃当前episode
+q：安全退出
+
+仅可视化episode 0及全部多模态数据（不连接或控制真机）：
+python -m rebot_act_real.workflow.replay --root ./data_act_real/rebot_act_banana --episode-idx 0 --visualize-only
+
+真机动作重播（终端需输入REPLAY；默认重播采集时实际下发的action）：
+python -m rebot_act_real.workflow.replay --root ./data_act_real/rebot_act_banana --episode-idx 0 --cfg rebot_act_real/workflow/config/arm.yaml --gripper-cfg rebot_act_real/workflow/config/gripper.yaml --speed-scale 1 --execute --yes
+
+动作重播说明：
+窗口中按q或Esc、终端按Ctrl+C可中止。回放结束后默认保持机械臂和夹爪使能及最后目标，防止机械臂突然失能下坠。不要添加--final-disable，除非已经确认失能安全。
+
+完整检查ACT多模态数据集：
+python -m rebot_act_real.workflow.inspect_dataset --root ./data_act_real/rebot_act_banana --image-check all
+
+完整检查并保存JSON报告：
+python -m rebot_act_real.workflow.inspect_dataset --root ./data_act_real/rebot_act_banana --image-check all --json-report ./data_act_real/rebot_act_banana_report.json
+
+快速抽样解码检查：
+python -m rebot_act_real.workflow.inspect_dataset --root ./data_act_real/rebot_act_banana --image-check sample
+
+检查说明：
+50Hz数据采样读取低于50Hz的相机最新帧时，连续图像和相机frame ID重复属于预期现象。需要结合unique_frames、相机实际帧率和是否长时间完全卡帧判断，不能仅凭重复帧warning认定数据损坏。
+
+ACT训练预检（不启动训练）：
+python -m rebot_act_real.workflow.train --check-only
+
+ACT正式训练（默认双相机、chunk_size=50、n_action_steps=25、10000步）：
+python -m rebot_act_real.workflow.train
+
+ACT动作队列shadow（读取真机观测并推理，但不下发动作）：
+python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --shadow --rate 50 --n-action-steps 20 --visualize
+
+ACT动作队列真机部署(效果一般————夹爪很难张开)：
+python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --n-action-steps 20 --accel-limit --max-accel 3 3 3 4 4 4 --visualize --yes
+
+ACT原生时间集合（当前实测推荐； 强制n_action_steps=1，每个控制步完整推理）：
+python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble --temporal-ensemble-coeff 0.01 --visualize --yes
+
+部署说明：
+必须先完成训练并使用checkpoints/last/pretrained_model。时间集合模式只有在inference稳定低于20ms、hz接近50且overrun不持续增长时才适合真机；否则使用已验证的n_action_steps=20动作队列模式。20步在50Hz下连续执行0.4秒，同时每0.4秒根据最新观测重新规划。
+
+
+ACT实时MIT关节阻抗真机部署（真机已验证效果良好，默认开启重力补偿）：
+python -m rebot_act_real.workflow.deploy_impedance_control --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble-coeff 0.01 --mit-kp 16 16 16 12 12 12 --mit-kd 0.1 0.3 0.3 0.2 0.1 0.1 --mit-kp-ramp-sec 0 --accel-limit --max-accel 2 2 2 3 3 3 --visualize --yes
+
+关节阻抗说明：
+deploy_impedance_control固定使用ACT原生时间集合（n_action_steps=1，每个控制步完整推理），默认同时启用MIT阻抗和实时重力补偿，ACT始终提供目标位置。若动力学扩展不可用，程序会在使能机械臂前报错；--no-gravity-compensation只用于排查环境问题，不建议用于真机任务。低刚度阻抗只能降低接触刚性和冲击，不是碰撞检测器，不能替代物理急停。
+
+ACT多模态消融训练（相机和关节状态始终保留）：
+纯相机基线：
+python -m rebot_act_real.workflow.train
+IMU（输出目录自动增加_imu）：
+python -m rebot_act_real.workflow.train --imu
+触觉（输出目录自动增加_tactile）：
+python -m rebot_act_real.workflow.train --tactile
+IMU+触觉（输出目录自动增加_imu_tactile）：
+python -m rebot_act_real.workflow.train --imu --tactile
+
+多模态预检：
+python -m rebot_act_real.workflow.train --imu --tactile --check-only
+
+多模态部署必须传入与checkpoint一致的--imu/--tactile；checkpoint内的rebot_multimodal.json用于防止消融权重混用。IMU默认/dev/ttyUSB1，触觉默认/dev/ttyUSB2。
+
+普通ACT多模态可视化(IMU+触觉)：
+python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_imu_tactile/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble --temporal-ensemble-coeff 0.01 --imu --tactile --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --sensor-ready-timeout-s 30 --visualize --yes
+
+MIT阻抗IMU+触觉真机部署：
+python -m rebot_act_real.workflow.deploy_impedance_control --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_imu_tactile/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble-coeff 0.01 --imu --tactile --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --sensor-ready-timeout-s 30 --mit-kp 16 16 16 12 12 12 --mit-kd 0.1 0.3 0.3 0.3 0.1 0.1 --mit-kp-ramp-sec 0 --accel-limit --max-accel 2 2 2 3 3 3 --visualize --yes
+
+多模态可视化说明：
+窗口左侧保留双相机、关节状态和动作曲线；右侧显示IMU四元数、角速度、加速度及模长，以及12x30触觉热力图、最大值、均值和白色十字标记的接触压力中心。只启用--imu或--tactile时，未启用模态显示DISABLED。
+部署会先等待FlexiTac完成无接触baseline并收到IMU/触觉有效首帧，再连接和使能机械臂。默认等待15秒；设备启动较慢时可添加--sensor-ready-timeout-s 30。baseline期间必须保持触觉阵列无接触。
+
+————————————————————————————————————————————————————————————————————————————————————————————————————
+
+策略部署实验记录（普通ACT和MIT阻抗入口默认关闭，必须显式开启）：
+在原部署命令末尾添加--record后，程序会在rebot_act_real/policy_logging/runs下创建唯一实验目录，记录关节反馈/速度、ACT原始动作、实际安全命令、跟踪误差、推理与控制时序、相机/传感器帧号和时间戳，以及启用的IMU、触觉和MIT力矩数据。
+论文正式实验建议在原部署命令末尾添加：
+--record --max-steps 800 --run-name banana_imu_tactile_seed01
+定性视频实验添加（会增加磁盘I/O，正式50Hz性能测试默认不要开启）：
+--record --record-images --max-steps 800 --run-name banana_video_seed01
+不添加--record时不会创建实验目录或启动后台写盘线程。--record-images不能脱离--record单独使用。
+双相机视频按数据chunk保存为可独立播放的短MP4；强制中断最多影响尚未提交的最后一段，已经保存的分段不会因缺少MP4尾部索引而整体损坏。
+
+固定推理时间步（推荐用于可重复的论文实验）：
+--max-steps限制的是控制循环步数，0表示不限制。50Hz下800步约16秒、1500步约30秒、3000步约60秒。实际墙钟时长可能因推理超时略长，应以日志中的duration_s和loop_dt_s为准。
+普通ACT多模态固定800步并记录视频：
+python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_imu_tactile/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble --temporal-ensemble-coeff 0.01 --imu --tactile --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --sensor-ready-timeout-s 30 --visualize --yes --record --record-images --max-steps 800 --run-name banana_video_seed01
+程序到达第800个控制步后会正常退出并完整封装最后一个视频分段，无需手动中断。
+
+为一次推理实验生成顶刊/顶会风格300dpi PNG曲线、关键帧拼图和多模态综合大图：
+python -m rebot_act_real.policy_logging.analyze --run rebot_act_real/policy_logging/runs/20260728_182606_banana_video_seed01
+包含触觉数据时还会自动生成tactile_analysis.png，联合展示触觉曲线、关键阵列热力图、三维峰值表面、时空响应、接触中心轨迹及峰值同步双相机画面。
+包含IMU数据时还会自动生成imu_analysis.png，联合展示三维姿态轨迹、四元数/相对旋转、角速度、加速度、姿态坐标架序列、频谱、运动强度及峰值同步双相机画面。
+
+记录格式、字段、单位和论文实验命名建议：
+rebot_act_real/policy_logging/README.md

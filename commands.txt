@@ -1,0 +1,104 @@
+# LeRobot + MuJoCo 项目环境配置
+# 请在本项目根目录执行以下命令。
+
+# 1. 快速创建最小 Conda 环境（只安装 Python、pip、tk）
+conda env create -f environment-rebot.yml
+
+# 2. 激活环境
+conda activate lerobot_rebot
+
+# 隔离 ~/.local 与 ROS 工作空间中的旧包，防止 pip check 误报其他环境问题。
+# 首次执行后需要重新激活环境，使变量生效。
+conda env config vars set PYTHONNOUSERSITE=1 PYTHONPATH=""
+conda deactivate
+conda activate lerobot_rebot
+
+# 如果 conda activate 提示需要初始化 shell，执行下面两行后重新激活
+# conda init bash
+# exec bash
+# conda activate lerobot_rebot
+
+# 3. 更新 pip 安装工具
+python -m pip install --upgrade pip setuptools wheel
+
+# 4. 安装与 LeRobot 依赖匹配、且兼容当前 NVIDIA 535 驱动的 PyTorch
+# 驱动最高支持 CUDA 12.2，不能使用项目原来的 cu124；CUDA 11.8 wheel
+# 可由该驱动向后兼容，并提供 LeRobot 要求的 Torch 2.6/torchvision 0.21。
+# 此命令也会安全替换此前安装的 Torch 2.5.1+cu121。
+python -m pip install --upgrade torch==2.6.0+cu118 torchvision==0.21.0+cu118 torchaudio==2.6.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+# 5. 先安装 MuJoCo 和普通 PyPI 依赖
+python -m pip install -r requirements-rebot.txt
+
+# 6. 最后安装项目指定版本的 LeRobot，并启用 Pi0/SmolVLA 依赖
+# 使用提交 ZIP 避免 git clone 下载仓库历史；constraints 文件禁止 pip
+# 替换已经安装好的 PyTorch 组合。中断时只需重试这一行。
+python -m pip install --upgrade -c constraints-rebot.txt --extra-index-url https://download.pytorch.org/whl/cu118 "lerobot[pi0,smolvla] @ https://github.com/huggingface/lerobot/archive/10b7b3532543b4adfb65760f02a49b4c537afde7.zip"
+
+# 7. 解压 MuJoCo 场景资源（仅首次配置时执行）
+unzip asset/objaverse/plate_11.zip -d asset/objaverse
+
+# 8. 将该环境注册为 Jupyter 内核
+python -m ipykernel install --user --name lerobot_rebot --display-name "Python (lerobot_rebot)"
+
+# 9. 检查 Python、PyTorch、CUDA、MuJoCo 和 LeRobot
+python --version
+ffmpeg -version
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA runtime:', torch.version.cuda); print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'not available')"
+python -c "import mujoco, lerobot; print('MuJoCo:', mujoco.__version__); print('LeRobot import: OK')"
+python -c "from lerobot.common.policies.pi0.modeling_pi0 import PI0Policy; from lerobot.common.policies.smolvla.modeling_smolvla import SmolVLAPolicy; print('Pi0/SmolVLA imports: OK')"
+python -m pip check
+
+# 10. 启动 Notebook，在页面中选择 Python (lerobot_rebot) 内核
+jupyter lab
+
+# 常用环境管理命令
+# conda activate lerobot_rebot
+# conda deactivate
+# conda env list
+# 如果创建失败留下了不完整环境，可以删除后重建：
+# conda env remove -n lerobot_rebot
+
+# 已按旧版文件安装过的环境，需要隔离用户包并补齐曾被 ~/.local 掩盖的依赖：
+conda env config vars set PYTHONNOUSERSITE=1 PYTHONPATH=""
+conda deactivate
+conda activate lerobot_rebot
+python -m pip uninstall -y opencv-python-headless opencv-python
+python -m pip install --force-reinstall -c constraints-rebot.txt "numpy==1.26.4" "opencv-python>=4.9,<4.12"
+python -m pip install -r requirements-rebot.txt
+python -m pip install --upgrade -c constraints-rebot.txt --extra-index-url https://download.pytorch.org/whl/cu118 "lerobot[pi0,smolvla] @ https://github.com/huggingface/lerobot/archive/10b7b3532543b4adfb65760f02a49b4c537afde7.zip"
+# LeRobot 会通过包元数据再次安装 headless 版。真机环境最后统一切回
+# GUI 版；不要让 opencv-python 与 opencv-python-headless 共存。
+python -m pip uninstall -y opencv-python-headless
+python -m pip install --force-reinstall --no-deps -c constraints-rebot.txt "opencv-python>=4.9,<4.12"
+python -c "import cv2; assert 'GUI:                           NONE' not in cv2.getBuildInformation(); print('OpenCV GUI: OK')"
+python -m pip install -c constraints-rebot.txt "openni==2.3.0"
+python -c "from openni import openni2; print('OpenNI Python binding: OK')"
+python -m pip install -c constraints-rebot.txt "pyrealsense2==2.58.3.10794"
+python -c "import pyrealsense2 as rs; print('RealSense Python binding: OK')"
+python -m pip install -c constraints-rebot.txt "motorbridge==0.5.0"
+python -c "from motorbridge import Controller, Mode, CallError; print('motorbridge: OK')"
+python -m pip install -c constraints-rebot.txt "pin==2.6.2"
+python -c "import pinocchio as pin; print('Pinocchio:', pin.__version__)"
+python -m pip check
+python -c "from lerobot.common.policies.pi0.modeling_pi0 import PI0Policy; from lerobot.common.policies.smolvla.modeling_smolvla import SmolVLAPolicy; print('Pi0/SmolVLA: OK')"
+
+# Pi0 首次下载与直接推理（按需执行）
+# 1. 浏览器登录 Hugging Face，访问下方页面并接受 Google PaliGemma 条款：
+# https://huggingface.co/google/paligemma-3b-pt-224
+# 2. 在 https://huggingface.co/settings/tokens 创建 Read token。
+# 3. 必须 export，使 hf 和 Python 子进程使用项目内缓存。
+export HF_HOME="$PWD/models/.hf_home"
+export HF_HUB_CACHE="$PWD/models"
+export HF_HUB_DISABLE_XET=1
+export HF_HUB_DOWNLOAD_TIMEOUT=300
+env | grep -E '^HF_HOME=|^HF_HUB_CACHE='
+# 4. 登录时粘贴 Read token；Add token as git credential 选择 n。
+hf auth login
+hf auth whoami
+ls -l "$HF_HOME/token"
+# 5. 下载并部署作者微调好的 Pi0；文件自动保存到 models/。
+python -m scripts.07_pi0 deploy --hub-model Jeongeun/omy_pnp_pi0
+# 缓存位置：
+# models/models--Jeongeun--omy_pnp_pi0/
+# models/models--google--paligemma-3b-pt-224/

@@ -1,0 +1,33 @@
+dataset:
+  repo_id: rebot_real/rebot_act_banana
+  root: ./data_act_real/rebot_act_banana
+
+policy:
+  type: act
+  chunk_size: 50
+  n_action_steps: 25
+  vision_backbone: resnet18
+  pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+  use_vae: true
+  latent_dim: 32
+  kl_weight: 10.0
+  device: cuda
+
+save_checkpoint: true
+output_dir: ./rebot_act_real/ckpt/act_rebot_real_banana_chunk50
+batch_size: 8
+job_name: act_rebot_real_banana_chunk50
+resume: false
+seed: 42
+num_workers: 8
+steps: 20_000
+eval_freq: -1
+log_freq: 50
+save_freq: 5_000
+use_policy_training_preset: true
+
+wandb:
+  enable: false
+  project: rebot_act_real
+  entity: null
+  disable_artifact: true

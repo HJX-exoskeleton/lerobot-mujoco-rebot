@@ -1,0 +1,35 @@
+
+
+采集20条数据（空数据集编号为0～19；已有数据集建议省略 --episode_idx 自动追加）：
+python -m rebot_smolvla_real.workflow.collect --repo-id rebot_real/rebot_smolvla_multimodal --root ./data_vla_real/rebot_smolvla_multimodal --instruction "抓取香蕉并放置到盘子中" --xml asset_rebot/reBot-DevArm_gripper.xml --cfg rebot_smolvla_real/workflow/config/arm.yaml --gripper-cfg rebot_smolvla_real/workflow/config/gripper.yaml --port /dev/ttyUSB0 --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --rate 50 --dataset-fps 50 --episode_len 800 --episodes 20 --episode_idx 0
+
+覆盖旧数据集并重新采集20条（会永久删除 --root 下的旧 LeRobot 数据）：
+python -m rebot_smolvla_real.workflow.collect --repo-id rebot_real/rebot_smolvla_multimodal --root ./data_vla_real/rebot_smolvla_multimodal --instruction "抓取香蕉并放置到盘子中" --xml asset_rebot/reBot-DevArm_gripper.xml --cfg rebot_smolvla_real/workflow/config/arm.yaml --gripper-cfg rebot_smolvla_real/workflow/config/gripper.yaml --port /dev/ttyUSB0 --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --rate 50 --dataset-fps 50 --episode_len 800 --episodes 20 --episode_idx 0 --overwrite-dataset
+
+完整检查采集好的数据集，并保存JSON报告：
+python -m rebot_smolvla_real.workflow.inspect_dataset --root ./data_vla_real/rebot_smolvla_multimodal --image-check all --json-report ./data_vla_real/rebot_smolvla_multimodal_report.json
+
+动作重播：
+仅可视化 episode，不控制真机：
+python -m rebot_smolvla_real.workflow.replay --root ./data_vla_real/rebot_smolvla_multimodal --episode-idx 0 --visualize-only
+真机重播（终端需输入 REPLAY）：
+python -m rebot_smolvla_real.workflow.replay --root ./data_vla_real/rebot_smolvla_multimodal --episode-idx 0 --cfg rebot_smolvla_real/workflow/config/arm.yaml --gripper-cfg rebot_smolvla_real/workflow/config/gripper.yaml --speed-scale 1 --execute
+
+
+SmolVLA训练预检：
+python -m rebot_smolvla_real.workflow.train --check-only
+
+SmolVLA训练：
+python -m rebot_smolvla_real.workflow.train
+
+SmolVLA异步低抖动50Hz shadow：
+python -m rebot_smolvla_real.workflow.deploy_new --checkpoint rebot_smolvla_real/ckpt/smolvla_rebot_real_banana/checkpoints/last/pretrained_model --instruction "抓取香蕉并放置到盘子中" --shadow --inference-every 1 --rate 50 --noise-correlation 0.7 --chunk-takeover-steps 1 --visualize
+
+SmolVLA异步低抖动新版真机部署（香蕉抓取实测推荐；--yes 跳过 DEPLOY 文本确认）：
+python -m rebot_smolvla_real.workflow.deploy_new --checkpoint rebot_smolvla_real/ckpt/smolvla_rebot_real_banana/checkpoints/last/pretrained_model --instruction "抓取香蕉并放置到盘子中" --execute --inference-every 1 --rate 50 --noise-correlation 0.7 --chunk-takeover-steps 1 --visualize --yes
+
+chunk16时间集合不明显时的流畅运行推荐组（真机验证关节不再抖动）：
+python -m rebot_smolvla_real.workflow.deploy_new --checkpoint rebot_smolvla_real/ckpt/smolvla_rebot_real_banana_chunk16/checkpoints/last/pretrained_model --instruction "抓取香蕉并放置到盘子中" --execute --inference-every 1 --rate 50 --noise-correlation 0.9 --chunk-takeover-steps 2 --temporal-ensemble --temporal-ensemble-k 0.05 --temporal-ensemble-history 5 --accel-limit --max-accel 2.5 2.5 2.5 3.5 3.5 3.5 --visualize --yes
+
+程序默认使用原始关节执行参数（vlim、max-step、SafetyGuard）。--accel-limit 启用最终关节位置命令的加速度连续整形，不修改VLA推理目标，也不是阻抗控制；--max-accel 的六个值依次对应J1～J6，单位rad/s²，越小越平滑但跟随延迟越大。当前真机验证值为2.5 2.5 2.5 3.5 3.5 3.5。其他对比开关：--sync-inference 恢复同步；--fixed-noise 测试固定推理噪声；--no-temporal-ensemble 关闭时间集合；--no-gripper-filter 关闭夹爪低通和死区。终端 hz 为最近约1秒的实际循环频率，overrun 为累计超过20ms的控制周期数，age 为chunk所用观测距当前控制步数。
+普通基线使用chunk_size/n_action_steps=16、--noise-correlation 0.7 和 --chunk-takeover-steps 1。流畅运行推荐组提高到相关系数0.9、takeover=2，将时间集合设为k=0.05、history=5，并启用accel-limit。终端ensemble持续为1表示当前步没有重叠预测可融合；此时accel-limit仍可抑制最终关节命令的速度突变。若动作跟随变慢或夹爪时机提前，应先提高max-accel，再逐项退回普通基线。

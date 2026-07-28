@@ -1,0 +1,518 @@
+<mujoco>
+  <body name="touch_pad_right" pos="-0.01 0.093 0.0435" euler="1.57 0 0" gravcomp="1">
+    <geom class="pad" name="touch_base_right" type="box" pos="0.015 0.015 0.0116" size="0.008 0.016 0.0002" rgba="0.15 0.15 0.15 1" />
+    <body name="touch_cell_right_000" pos="0.008000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_000" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_001" pos="0.010000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_001" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_002" pos="0.012000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_002" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_003" pos="0.014000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_003" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_004" pos="0.016000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_004" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_005" pos="0.018000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_005" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_006" pos="0.020000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_006" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_007" pos="0.022000 0.000000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_007" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_008" pos="0.008000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_008" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_009" pos="0.010000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_009" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_010" pos="0.012000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_010" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_011" pos="0.014000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_011" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_012" pos="0.016000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_012" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_013" pos="0.018000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_013" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_014" pos="0.020000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_014" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_015" pos="0.022000 0.002000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_015" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_016" pos="0.008000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_016" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_017" pos="0.010000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_017" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_018" pos="0.012000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_018" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_019" pos="0.014000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_019" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_020" pos="0.016000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_020" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_021" pos="0.018000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_021" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_022" pos="0.020000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_022" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_023" pos="0.022000 0.004000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_023" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_024" pos="0.008000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_024" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_025" pos="0.010000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_025" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_026" pos="0.012000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_026" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_027" pos="0.014000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_027" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_028" pos="0.016000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_028" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_029" pos="0.018000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_029" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_030" pos="0.020000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_030" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_031" pos="0.022000 0.006000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_031" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_032" pos="0.008000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_032" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_033" pos="0.010000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_033" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_034" pos="0.012000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_034" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_035" pos="0.014000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_035" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_036" pos="0.016000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_036" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_037" pos="0.018000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_037" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_038" pos="0.020000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_038" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_039" pos="0.022000 0.008000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_039" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_040" pos="0.008000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_040" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_041" pos="0.010000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_041" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_042" pos="0.012000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_042" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_043" pos="0.014000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_043" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_044" pos="0.016000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_044" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_045" pos="0.018000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_045" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_046" pos="0.020000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_046" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_047" pos="0.022000 0.010000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_047" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_048" pos="0.008000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_048" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_049" pos="0.010000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_049" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_050" pos="0.012000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_050" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_051" pos="0.014000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_051" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_052" pos="0.016000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_052" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_053" pos="0.018000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_053" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_054" pos="0.020000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_054" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_055" pos="0.022000 0.012000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_055" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_056" pos="0.008000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_056" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_057" pos="0.010000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_057" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_058" pos="0.012000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_058" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_059" pos="0.014000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_059" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_060" pos="0.016000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_060" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_061" pos="0.018000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_061" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_062" pos="0.020000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_062" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_063" pos="0.022000 0.014000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_063" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_064" pos="0.008000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_064" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_065" pos="0.010000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_065" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_066" pos="0.012000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_066" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_067" pos="0.014000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_067" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_068" pos="0.016000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_068" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_069" pos="0.018000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_069" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_070" pos="0.020000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_070" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_071" pos="0.022000 0.016000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_071" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_072" pos="0.008000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_072" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_073" pos="0.010000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_073" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_074" pos="0.012000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_074" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_075" pos="0.014000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_075" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_076" pos="0.016000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_076" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_077" pos="0.018000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_077" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_078" pos="0.020000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_078" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_079" pos="0.022000 0.018000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_079" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_080" pos="0.008000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_080" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_081" pos="0.010000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_081" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_082" pos="0.012000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_082" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_083" pos="0.014000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_083" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_084" pos="0.016000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_084" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_085" pos="0.018000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_085" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_086" pos="0.020000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_086" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_087" pos="0.022000 0.020000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_087" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_088" pos="0.008000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_088" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_089" pos="0.010000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_089" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_090" pos="0.012000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_090" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_091" pos="0.014000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_091" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_092" pos="0.016000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_092" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_093" pos="0.018000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_093" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_094" pos="0.020000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_094" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_095" pos="0.022000 0.022000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_095" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_096" pos="0.008000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_096" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_097" pos="0.010000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_097" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_098" pos="0.012000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_098" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_099" pos="0.014000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_099" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_100" pos="0.016000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_100" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_101" pos="0.018000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_101" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_102" pos="0.020000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_102" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_103" pos="0.022000 0.024000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_103" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_104" pos="0.008000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_104" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_105" pos="0.010000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_105" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_106" pos="0.012000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_106" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_107" pos="0.014000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_107" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_108" pos="0.016000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_108" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_109" pos="0.018000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_109" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_110" pos="0.020000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_110" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_111" pos="0.022000 0.026000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_111" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_112" pos="0.008000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_112" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_113" pos="0.010000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_113" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_114" pos="0.012000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_114" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_115" pos="0.014000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_115" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_116" pos="0.016000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_116" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_117" pos="0.018000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_117" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_118" pos="0.020000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_118" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_119" pos="0.022000 0.028000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_119" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_120" pos="0.008000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_120" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_121" pos="0.010000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_121" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_122" pos="0.012000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_122" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_123" pos="0.014000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_123" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_124" pos="0.016000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_124" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_125" pos="0.018000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_125" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_126" pos="0.020000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_126" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+    <body name="touch_cell_right_127" pos="0.022000 0.030000 0.012000" gravcomp="1">
+      <geom class="pad" type="box" size="0.001 0.001 0.0002" rgba="0.5 0.3 0.2 0.3" mass="0"/>
+      <site name="touch_point_right_127" pos="0 0 0" size="0.0002 0.0002 0.0002" rgba="0.2 0.2 0.2 0"/>
+    </body>
+  </body>
+
+</mujoco>

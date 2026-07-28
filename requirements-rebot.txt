@@ -1,0 +1,43 @@
+# Install PyTorch separately first, as shown in commands.txt. Keeping it out of
+# this file prevents pip from replacing the driver-compatible cu118 build.
+
+# Versions expected by the repository's pinned LeRobot revision. LeRobot itself
+# is installed separately from its commit ZIP, as shown in commands.txt.
+transformers==4.50.3
+datasets==3.4.1
+pyarrow==19.0.1
+safetensors==0.5.3
+accelerate>=1.7,<2
+num2words>=0.5.14,<1
+
+# Simulation and packages imported directly by mujoco_env/*.py.
+mujoco==3.1.6
+numpy==1.26.4
+scipy>=1.11,<1.16
+matplotlib>=3.8,<3.11
+# The real-robot camera tools use cv2.imshow()/waitKey(), so this environment
+# needs OpenCV's GUI-enabled wheel. Keep opencv-python-headless uninstalled:
+# both distributions provide the same cv2 module and cannot safely coexist.
+opencv-python>=4.9,<4.12
+# Python bindings used by the Orbbec Astra-S helpers. The native Orbbec
+# OpenNI2 redistributable is installed separately; see REPRODUCE_CN.md.
+openni==2.3.0
+# Intel RealSense SDK Python wrapper used by the D405 camera helpers.
+pyrealsense2==2.58.3.10794
+# Rust-backed motor SDK used by the real reBot arm and gripper controllers.
+motorbridge==0.5.0
+# Pinocchio distribution used by reBot kinematics, dynamics and trajectories.
+# The distribution is named "pin", while Python code imports "pinocchio".
+pin==2.6.2
+Pillow>=10,<12
+glfw>=2.7,<3
+pyautogui>=0.9.54,<1
+
+# Training/configuration and notebook workflow.
+termcolor>=2.4,<4
+wandb>=0.17,<0.20
+jupyterlab>=4.2,<5
+ipykernel>=6.29,<7
+ipywidgets>=8.1,<9
+pytest>=8,<9
+tqdm>=4.66,<5

@@ -1,0 +1,27 @@
+dataset:
+  repo_id: rebot_real/rebot_smolvla_multimodal
+  root: ./data_vla_real/rebot_smolvla_multimodal
+policy:
+  type: smolvla
+  chunk_size: 16  # 5
+  n_action_steps: 16  # 5
+  device: cuda
+
+save_checkpoint: true
+output_dir: ./rebot_smolvla_real/ckpt/smolvla_rebot_real_banana_chunk16
+batch_size: 4
+job_name: smolvla_rebot_real_banana_chunk16
+resume: false
+seed: 42
+num_workers: 8
+steps: 50_000
+eval_freq: -1
+log_freq: 50
+save_freq: 5_000
+use_policy_training_preset: true
+
+wandb:
+  enable: false
+  project: smolvla_rebot_real
+  entity: null
+  disable_artifact: true
