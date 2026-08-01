@@ -1,0 +1,484 @@
+"""Task-level adapter with explicit observation, target and sensor semantics."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import glfw
+import numpy as np
+from PIL import Image
+
+from .schema import FPS, IMAGE_HEIGHT, IMAGE_WIDTH, TACTILE_SHAPE
+from .sensors import (
+    TactileProcessingConfig,
+    TactileSignalProcessor,
+    read_tactile_contact_projection,
+    read_imu,
+    read_tactile_normal,
+)
+
+JOINT_NAMES = tuple(f"joint{i}" for i in range(1, 7))
+TRANSLATION_STEP = 0.003
+ROTATION_STEP = 0.02
+
+
+@dataclass(frozen=True)
+class SimObservation:
+    image: np.ndarray
+    wrist_image: np.ndarray
+    joint_position: np.ndarray
+    joint_velocity: np.ndarray
+    gripper_position: float
+    gripper_velocity: float
+    imu: np.ndarray
+    tactile_left: np.ndarray
+    tactile_right: np.ndarray
+    tactile_left_raw: np.ndarray
+    tactile_right_raw: np.ndarray
+    sim_time: float
+
+
+def _resize_rgb(value: np.ndarray) -> np.ndarray:
+    value = np.asarray(value, dtype=np.uint8)
+    if value.shape[:2] == (IMAGE_HEIGHT, IMAGE_WIDTH):
+        return value.copy()
+    return np.asarray(
+        Image.fromarray(value).resize((IMAGE_WIDTH, IMAGE_HEIGHT), Image.Resampling.BILINEAR)
+    )
+
+
+def success_hold_steps(seconds: float, control_hz: int) -> int:
+    if seconds <= 0:
+        raise ValueError("success hold seconds must be positive")
+    if control_hz <= 0:
+        raise ValueError("control_hz must be positive")
+    return max(1, int(np.ceil(seconds * control_hz)))
+
+
+def teleop_delta_from_keys(
+    repeated_keys: set[int],
+    *,
+    gripper_state: bool,
+    toggle_gripper: bool = False,
+) -> tuple[np.ndarray, bool]:
+    """Map keys to a tool-local Cartesian delta and updated gripper state.
+
+    Arrow keys follow screen-like semantics:
+    up/down pitch the gripper forward/backward; left/right roll it
+    counter-clockwise/clockwise. Q/E retain local yaw control.
+    """
+
+    dpos = np.zeros(3, dtype=np.float32)
+    drpy = np.zeros(3, dtype=np.float32)
+    if glfw.KEY_S in repeated_keys:
+        dpos[0] += TRANSLATION_STEP
+    if glfw.KEY_W in repeated_keys:
+        dpos[0] -= TRANSLATION_STEP
+    if glfw.KEY_A in repeated_keys:
+        dpos[1] -= TRANSLATION_STEP
+    if glfw.KEY_D in repeated_keys:
+        dpos[1] += TRANSLATION_STEP
+    if glfw.KEY_R in repeated_keys:
+        dpos[2] += TRANSLATION_STEP
+    if glfw.KEY_F in repeated_keys:
+        dpos[2] -= TRANSLATION_STEP
+
+    # SimpleEnv post-multiplies the rotation, so these are tcp_link-local axes.
+    if glfw.KEY_UP in repeated_keys:
+        drpy[1] -= ROTATION_STEP       # pitch forward
+    if glfw.KEY_DOWN in repeated_keys:
+        drpy[1] += ROTATION_STEP       # pitch backward
+    if glfw.KEY_LEFT in repeated_keys:
+        drpy[0] -= ROTATION_STEP       # counter-clockwise roll
+    if glfw.KEY_RIGHT in repeated_keys:
+        drpy[0] += ROTATION_STEP       # clockwise roll
+    if glfw.KEY_Q in repeated_keys:
+        drpy[2] += ROTATION_STEP
+    if glfw.KEY_E in repeated_keys:
+        drpy[2] -= ROTATION_STEP
+
+    next_gripper_state = not gripper_state if toggle_gripper else gripper_state
+    action = np.concatenate(
+        [dpos, drpy, np.asarray([next_gripper_state], dtype=np.float32)]
+    )
+    return action.astype(np.float32, copy=False), next_gripper_state
+
+
+class SimACTEnvironment:
+    """Thin compatibility layer over ``SimpleEnv``.
+
+    ``observation.state`` is measured joint position. ``action`` is always the
+    target sent for the next control interval: six radians plus binary gripper.
+    """
+
+    def __init__(
+        self,
+        xml_path: str | Path,
+        *,
+        seed: int | None = None,
+        success_hold_seconds: float = 0.5,
+        control_hz: int = FPS,
+        plate_position: tuple[float, float, float] | list[float] | None = None,
+        target_object_position_center: tuple[float, float, float]
+        | list[float]
+        | None = None,
+        target_object_xy_half_range: tuple[float, float] | list[float] | None = None,
+        tactile_processing: dict | None = None,
+        teleop_motion_alpha: float = 0.25,
+        grab_sideview: bool = True,
+        enable_tactile_processing: bool = True,
+    ):
+        from mujoco_env.y_env import SimpleEnv
+
+        self.task = SimpleEnv(str(xml_path), action_type="eef_pose", state_type="joint_angle", seed=seed)
+        self.success_hold_steps = success_hold_steps(success_hold_seconds, control_hz)
+        self._grab_sideview = bool(grab_sideview)
+        self._enable_tactile_proc = bool(enable_tactile_processing)
+        self.tactile_config = TactileProcessingConfig.from_mapping(
+            tactile_processing
+        )
+        self.tactile_processor = TactileSignalProcessor(self.tactile_config)
+        self.teleop_motion_alpha = float(teleop_motion_alpha)
+        if not 0 < self.teleop_motion_alpha <= 1:
+            raise ValueError("teleop_motion_alpha must be in (0, 1]")
+        self._teleop_motion = np.zeros(6, dtype=np.float32)
+        if self._enable_tactile_proc:
+            self._configure_tactile_contact_dynamics()
+        self.plate_position = self._position3(plate_position, "plate_position")
+        self.target_object_position_center = self._position3(
+            target_object_position_center, "target_object_position_center"
+        )
+        if target_object_xy_half_range is None:
+            self.target_object_xy_half_range = None
+        else:
+            self.target_object_xy_half_range = np.asarray(
+                target_object_xy_half_range, dtype=np.float64
+            )
+            if self.target_object_xy_half_range.shape != (2,) or np.any(
+                self.target_object_xy_half_range < 0
+            ):
+                raise ValueError(
+                    "target_object_xy_half_range must contain two nonnegative values"
+                )
+        if (self.plate_position is None) != (
+            self.target_object_position_center is None
+        ):
+            raise ValueError(
+                "plate_position and target_object_position_center must be "
+                "configured together"
+            )
+        if (
+            self.target_object_position_center is not None
+            and self.target_object_xy_half_range is None
+        ):
+            raise ValueError(
+                "target_object_xy_half_range is required for object randomization"
+            )
+        self._last_gripper_position = self._gripper_position()
+        self._last_time = float(self.task.env.get_sim_time())
+        self._success_count = 0
+
+    @staticmethod
+    def _position3(value, name: str) -> np.ndarray | None:
+        if value is None:
+            return None
+        result = np.asarray(value, dtype=np.float64)
+        if result.shape != (3,) or not np.all(np.isfinite(result)):
+            raise ValueError(f"{name} must contain three finite values")
+        return result
+
+    def _configure_tactile_contact_dynamics(self) -> None:
+        """Use one continuous collision surface instead of 128 coplanar geoms."""
+
+        for side in ("left", "right"):
+            pad = self.parser.model.geom(f"touch_base_{side}")
+            if self.tactile_config.signal_source == "continuous_contact_projection":
+                # The legacy base surface is 0.4 mm behind the taxel faces.
+                # Move it flush with them and disable the competing cell contacts.
+                pad.pos[2] = 0.012
+                pad.contype[0] = 1
+                pad.conaffinity[0] = 1
+                pad.solref[0] = self.tactile_config.contact_time_constant
+            for index in range(TACTILE_SHAPE[0] * TACTILE_SHAPE[1]):
+                body = self.parser.model.body(
+                    f"touch_cell_{side}_{index:03d}"
+                )
+                for offset in range(int(body.geomnum[0])):
+                    geom_index = int(body.geomadr[0]) + offset
+                    if (
+                        self.tactile_config.signal_source
+                        == "continuous_contact_projection"
+                    ):
+                        self.parser.model.geom_contype[geom_index] = 0
+                        self.parser.model.geom_conaffinity[geom_index] = 0
+                    self.parser.model.geom_solref[geom_index, 0] = (
+                        self.tactile_config.contact_time_constant
+                    )
+
+    def _set_controlled_object_positions(self, seed: int | None) -> None:
+        if self.plate_position is None:
+            return
+        rng = np.random.default_rng(seed)
+        target = self.target_object_position_center.copy()
+        target[:2] += rng.uniform(
+            -self.target_object_xy_half_range, self.target_object_xy_half_range
+        )
+        if np.linalg.norm(target[:2] - self.plate_position[:2]) < 0.12:
+            raise ValueError(
+                "configured target object randomization can place it too close "
+                "to the plate"
+            )
+        self._set_object_pose_without_step(target, self.plate_position)
+        actual_target, actual_plate = self.task.get_obj_pose()
+        self.task.obj_init_pose = np.concatenate(
+            [actual_target, actual_plate], dtype=np.float32
+        )
+
+    def _table_top_z(self) -> float:
+        table = self.parser.model.geom("front_object_table")
+        return float(table.pos[2] + table.size[2])
+
+    def _set_object_pose_without_step(
+        self, target: np.ndarray, plate: np.ndarray
+    ) -> None:
+        """Place free bodies without generating a teleportation impulse."""
+
+        target = np.asarray(target, dtype=np.float64).copy()
+        # Keep the cube just above the tabletop. The following normal physics
+        # step lets gravity establish contact gradually instead of correcting a
+        # potentially penetrating pose with a large impulse.
+        cube_geom = self.parser.model.geom("geom_obj_red_cube")
+        minimum_z = self._table_top_z() + float(cube_geom.size[2]) + 0.0005
+        target[2] = max(float(target[2]), minimum_z)
+        self.parser.set_p_base_body(body_name="body_obj_mug_5", p=target)
+        self.parser.set_R_base_body(
+            body_name="body_obj_mug_5", R=np.eye(3, dtype=np.float64)
+        )
+        self.parser.set_p_base_body(body_name="body_obj_plate_11", p=plate)
+        self.parser.set_R_base_body(
+            body_name="body_obj_plate_11", R=np.eye(3, dtype=np.float64)
+        )
+        self._zero_free_body_velocity("body_obj_mug_5")
+        self._zero_free_body_velocity("body_obj_plate_11")
+        self._enforce_plate_lock()
+        self.parser.forward(increase_tick=False)
+
+    def _free_joint_addresses(self, body_name: str) -> tuple[int, int]:
+        body = self.parser.model.body(body_name)
+        if int(body.jntnum[0]) != 1:
+            raise RuntimeError(f"{body_name} must have exactly one free joint")
+        joint_index = int(body.jntadr[0])
+        qpos_address = int(self.parser.model.jnt_qposadr[joint_index])
+        dof_address = int(self.parser.model.jnt_dofadr[joint_index])
+        return qpos_address, dof_address
+
+    def _zero_free_body_velocity(self, body_name: str) -> None:
+        _, dof_address = self._free_joint_addresses(body_name)
+        self.parser.data.qvel[dof_address : dof_address + 6] = 0.0
+
+    def _enforce_plate_lock(self) -> None:
+        if self.plate_position is None:
+            return
+        qpos_address, dof_address = self._free_joint_addresses(
+            "body_obj_plate_11"
+        )
+        self.parser.data.qpos[qpos_address : qpos_address + 3] = self.plate_position
+        self.parser.data.qpos[qpos_address + 3 : qpos_address + 7] = (
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        )
+        self.parser.data.qvel[dof_address : dof_address + 6] = 0.0
+        self.parser.forward(increase_tick=False)
+
+    @property
+    def parser(self):
+        return self.task.env
+
+    def reset(self, seed: int | None = None) -> None:
+        # Work around the legacy SimpleEnv reset bug that ignored nonzero seeds.
+        if seed is None:
+            self.task.reset(seed=None)
+        else:
+            rng_state = np.random.get_state()
+            np.random.seed(seed)
+            try:
+                self.task.reset(seed=None)
+            finally:
+                np.random.set_state(rng_state)
+        self._set_controlled_object_positions(seed)
+        self._last_gripper_position = self._gripper_position()
+        self._last_time = float(self.parser.get_sim_time())
+        self._success_count = 0
+        self.tactile_processor.reset()
+        self._teleop_motion.fill(0)
+
+    def poll_events(self) -> None:
+        """Poll GLFW events without rendering (headless mode).
+
+        Keeps the viewer window responsive so the user can close it.
+        """
+        glfw.poll_events()
+
+    def render_scene(self) -> None:
+        """Render the MuJoCo 3D viewer scene only — no PIP camera overlays,
+        no TCP sphere/capsule markers, no sensor panel.  The free camera
+        (orbit/pan/zoom) works normally.
+        """
+        self.parser.render()
+
+    def close(self) -> None:
+        self.parser.close_viewer()
+
+    def is_alive(self) -> bool:
+        return self.parser.is_viewer_alive()
+
+    def advance_physics(self) -> None:
+        self.task.step_env()
+        self._enforce_plate_lock()
+        if not self._enable_tactile_proc:
+            return
+        if self.tactile_config.signal_source == "continuous_contact_projection":
+            tactile_left, tactile_right = read_tactile_contact_projection(
+                self.parser,
+                projection_sigma=self.tactile_config.projection_sigma,
+            )
+        else:
+            tactile_left, tactile_right = read_tactile_normal(
+                self.parser, normal_axis=self.tactile_config.normal_axis
+            )
+        self.tactile_processor.update(tactile_left, tactile_right)
+
+    def is_control_tick(self, hz: int) -> bool:
+        return self.parser.loop_every(HZ=hz)
+
+    def _gripper_position(self) -> float:
+        return float(self.parser.get_qpos_joint(self.task.gripper_joint_name)[0])
+
+    def observe(self) -> SimObservation:
+        image, wrist = self.task.grab_image(grab_sideview=self._grab_sideview)
+        now = float(self.parser.get_sim_time())
+        dt = max(now - self._last_time, 1e-6)
+        gripper = self._gripper_position()
+        if self._enable_tactile_proc:
+            tactile_left, tactile_right = self.tactile_processor.consume()
+        else:
+            tactile_left = np.zeros(TACTILE_SHAPE, dtype=np.float32)
+            tactile_right = np.zeros(TACTILE_SHAPE, dtype=np.float32)
+        observation = SimObservation(
+            image=_resize_rgb(image),
+            wrist_image=_resize_rgb(wrist),
+            joint_position=np.asarray(
+                self.parser.get_qpos_joints(joint_names=list(JOINT_NAMES)), dtype=np.float32
+            ),
+            joint_velocity=np.asarray(
+                self.parser.get_qvel_joints(joint_names=list(JOINT_NAMES)), dtype=np.float32
+            ),
+            gripper_position=gripper,
+            gripper_velocity=(gripper - self._last_gripper_position) / dt,
+            imu=read_imu(self.parser),
+            tactile_left=tactile_left,
+            tactile_right=tactile_right,
+            tactile_left_raw=self.tactile_processor.latest_raw_left.copy(),
+            tactile_right_raw=self.tactile_processor.latest_raw_right.copy(),
+            sim_time=now,
+        )
+        self._last_gripper_position = gripper
+        self._last_time = now
+        return observation
+
+    def teleop_target(self) -> tuple[np.ndarray, bool]:
+        if self.parser.is_key_pressed_once(key=glfw.KEY_Z):
+            return np.zeros(7, dtype=np.float32), True
+        repeated_keys = {
+            key
+            for key in (
+                glfw.KEY_W,
+                glfw.KEY_A,
+                glfw.KEY_S,
+                glfw.KEY_D,
+                glfw.KEY_R,
+                glfw.KEY_F,
+                glfw.KEY_UP,
+                glfw.KEY_DOWN,
+                glfw.KEY_LEFT,
+                glfw.KEY_RIGHT,
+                glfw.KEY_Q,
+                glfw.KEY_E,
+            )
+            if self.parser.is_key_pressed_repeat(key=key)
+        }
+        delta_pose, self.task.gripper_state = teleop_delta_from_keys(
+            repeated_keys,
+            gripper_state=self.task.gripper_state,
+            toggle_gripper=self.parser.is_key_pressed_once(key=glfw.KEY_SPACE),
+        )
+        alpha = self.teleop_motion_alpha
+        self._teleop_motion = (
+            alpha * delta_pose[:6] + (1.0 - alpha) * self._teleop_motion
+        )
+        delta_pose[:6] = self._teleop_motion
+        self.task.action_type = "eef_pose"
+        self.task.step(delta_pose)
+        target = np.concatenate(
+            [
+                np.asarray(self.task.compute_q, dtype=np.float32),
+                np.asarray([float(self.task.gripper_state)], dtype=np.float32),
+            ]
+        )
+        return target, False
+
+    def command(self, action: np.ndarray) -> None:
+        action = np.asarray(action, dtype=np.float32)
+        if action.shape != (7,) or not np.all(np.isfinite(action)):
+            raise ValueError(f"invalid ACT action: {action}")
+        action = action.copy()
+        action[-1] = np.clip(action[-1], 0.0, 1.0)
+        self.task.action_type = "joint_angle"
+        self.task.step(action)
+
+    def render(
+        self, *, teleop: bool = False, sensor_panel: np.ndarray | None = None
+    ) -> None:
+        if sensor_panel is None:
+            self.task.render(teleop=teleop)
+            return
+        self.parser.viewer_rgb_overlay(sensor_panel, loc="top left")
+        if teleop:
+            self.parser.viewer_text_overlay(
+                text1="Key Pressed",
+                text2=f"{self.parser.get_key_pressed_list()}",
+            )
+            self.parser.viewer_text_overlay(
+                text1="Key Repeated",
+                text2=f"{self.parser.get_key_repeated_list()}",
+            )
+        # The sensor panel intentionally replaces the collection-only side view.
+        self.task.render(teleop=False)
+
+    def check_success(self) -> bool:
+        target, plate = self.task.get_obj_pose()
+        tcp, _ = self.parser.get_pR_body(body_name="tcp_link")
+        placed = (
+            np.linalg.norm(target[:2] - plate[:2]) < 0.08
+            and -0.02 < float(target[2] - plate[2]) < 0.15
+        )
+        released = self._gripper_position() > 0.04
+        retreated = (
+            np.linalg.norm(tcp[:2] - target[:2]) < 0.15
+            and float(tcp[2] - target[2]) > 0.08
+        )
+        self._success_count = self._success_count + 1 if placed and released and retreated else 0
+        return self._success_count >= self.success_hold_steps
+
+    @property
+    def object_initial_position(self) -> np.ndarray:
+        return np.asarray(self.task.obj_init_pose, dtype=np.float32)
+
+    def set_object_initial_position(self, value: np.ndarray) -> None:
+        value = np.asarray(value, dtype=np.float32)
+        if value.shape != (6,) or not np.all(np.isfinite(value)):
+            raise ValueError("object_initial_position must contain six finite values")
+        self._set_object_pose_without_step(value[:3], value[3:])

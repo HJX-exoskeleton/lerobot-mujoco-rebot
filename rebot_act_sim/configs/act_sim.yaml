@@ -1,0 +1,53 @@
+dataset:
+  repo_id: rebot_sim/rebot_act_red_cube
+  root: ./data_act_sim/rebot_act_red_cube
+  task: put_red_cube_on_plate
+  fps: 50
+
+environment:
+  xml: ./rebot_act_sim/assets/example_scene_rebot_red_cube.xml
+  seed: 0
+  success_hold_seconds: 0.5
+  object_randomization:
+    plate_position: [0.27, -0.16, 0.82]
+    target_object_position_center: [0.32, 0.08, 0.8205]
+    target_object_xy_half_range: [0.025, 0.025]
+  teleop:
+    motion_alpha: 0.25
+  tactile_processing:
+    signal_source: continuous_contact_projection
+    normal_axis: 2
+    projection_sigma: 0.0025
+    clip_max: 25.0
+    temporal_ema_alpha: 0.25
+    spatial_smoothing: true
+    contact_time_constant: 0.01
+    visualization_color_max: 2.0
+
+policy:
+  type: act
+  chunk_size: 50
+  n_action_steps: 25
+  vision_backbone: resnet18
+  pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+  use_vae: true
+  latent_dim: 32
+  kl_weight: 10.0
+  temporal_ensemble_coeff: null
+  device: cuda
+
+multimodal:
+  use_imu: false
+  use_tactile: false
+  sensor_embed_dim: 64
+
+training:
+  output_dir: ./rebot_act_sim/ckpt/act_sim_red_cube
+  steps: 8000
+  batch_size: 4
+  num_workers: 8
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  seed: 42
+  log_freq: 50
+  save_freq: 2000

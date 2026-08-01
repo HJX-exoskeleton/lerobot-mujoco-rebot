@@ -1,0 +1,48 @@
+<mujoco model="reBot red cube pick-and-place">
+  <size memory="500M"/>
+  <include file="../../asset/tabletop/object/floor_isaac_style.xml"/>
+  <include file="../../asset/tabletop/object/object_table.xml"/>
+  <include file="../../asset_rebot/reBot-DevArm_gripper_tactile.xml"/>
+  <include file="../../asset/objaverse/plate_11/model_new.xml"/>
+
+  <!--
+    MuJoCo box size is half extent, so this is a 4 cm cube.
+    The body name remains body_obj_mug_5 because the legacy SimpleEnv
+    constructor looks it up during reset. rebot_act_sim treats it as the
+    generic task object everywhere outside that compatibility boundary.
+  -->
+  <worldbody>
+    <body name="body_obj_mug_5" pos="0.32 0.08 0.82">
+      <freejoint/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="1.333e-5 1.333e-5 1.333e-5"/>
+      <geom
+        name="geom_obj_red_cube"
+        type="box"
+        size="0.02 0.02 0.02"
+        mass="0.05"
+        rgba="1 0 0 1"
+        condim="4"
+        friction="1.2 0.01 0.001"
+        solimp="0.95 0.99 0.001"
+        solref="0.01 1"
+      />
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="actuator_joint1" ctrllimited="true" ctrlrange="-1.87 1.87"
+              joint="joint1" kp="900" forcerange="-150 150" forcelimited="true"/>
+    <position name="actuator_joint2" ctrllimited="true" ctrlrange="-3.14 0"
+              joint="joint2" kp="900" forcerange="-150 150" forcelimited="true"/>
+    <position name="actuator_joint3" ctrllimited="true" ctrlrange="-3.14 0"
+              joint="joint3" kp="900" forcerange="-150 150" forcelimited="true"/>
+    <position name="actuator_joint4" ctrllimited="true" ctrlrange="-1.87 1.57"
+              joint="joint4" kp="600" forcerange="-100 100" forcelimited="true"/>
+    <position name="actuator_joint5" ctrllimited="true" ctrlrange="-1.57 1.57"
+              joint="joint5" kp="600" forcerange="-100 100" forcelimited="true"/>
+    <position name="actuator_joint6" ctrllimited="true" ctrlrange="-3.14 3.14"
+              joint="joint6" kp="600" forcerange="-100 100" forcelimited="true"/>
+    <position name="gripper" joint="left_finger" class="finger"
+              forcerange="-100 100" forcelimited="true"/>
+  </actuator>
+</mujoco>
