@@ -64,3 +64,42 @@ IMU实验会额外生成 `imu_analysis.png`，联合展示四元数恢复的三�
 循环而不是墙钟秒数；50 Hz 下800步名义上约16秒。达到步数后部署程序会正常退出，
 刷新最后一个数据分块和视频分段，因此不需要手动按 Ctrl+C。若控制循环发生超时，
 实际运行时长会略长，应使用日志中的 `duration_s` 和 `loop_dt_s` 报告真实时序。
+
+## 与示教数据集对比
+
+将一次部署记录和完整LeRobot示教集进行对比：
+
+```bash
+python -m rebot_act_real.policy_logging.compare_dataset \
+  --run rebot_act_real/policy_logging/runs/20260728_182606_banana_video_seed01 \
+  --dataset-root data_act_real/rebot_act_banana
+```
+
+默认输出到部署目录的 `comparison_with_demonstrations/`：
+
+- `comparison_joints.png`：20条示教的10–90%相位带、中位数和部署关节轨迹；
+- `comparison_overview.png`：夹爪、分布覆盖率、平滑性、分布距离和摘要；
+- `comparison_multimodal.png`：实际共有模态的IMU和触觉相位带对比；
+- `comparison_images.png`：状态轨迹最相似示教与部署的双相机同相位画面；
+- `comparison_manifold_3d.png`：状态、动作、联合和多模态空间的三维行为流形；
+- `comparison_cross_modal.png`：跨模态互信息、正则化CCA、时滞耦合网络和三维动态
+  相关曲面；
+- `comparison_metrics.json`：覆盖率、归一化Wasserstein距离、轨迹误差、最近示教、
+  速度/加速度/jerk、多模态距离及跨模态耦合矩阵。
+
+三维行为流形以全部示教样本拟合标准化PCA，淡蓝线表示20条示教、蓝线表示示教
+中位路径、绿线表示最近示教、时间着色轨迹表示部署。图中同时给出逐维相位z-score
+热力图、带协方差收缩的相位局部Mahalanobis距离，以及15%窗口约束DTW到每条示教
+的距离。PCA只用于可视化，图中明确报告前三主成分解释方差；论文定量结论应结合
+原空间覆盖率、Mahalanobis和DTW，而不能仅凭三维投影视觉距离。
+
+跨模态图以状态/动作/夹爪运动强度、IMU角速度/加速度和触觉峰值/接触面积为事件
+信号，使用归一化互信息捕捉非线性关系；同时对状态、动作、IMU和触觉特征块进行
+岭正则CCA，并用最优时滞和滑窗三维相关曲面描述耦合随任务进度的变化。相关性不
+代表因果性，时间自相关也可能抬高统计量，因此应报告相对示教基线的变化并在多个
+独立部署实验间汇总，而不是用单次实验的高相关值作因果结论。
+
+曲线按任务进度归一化到0–100%，因此不同长度轨迹可以比较。相位带衡量“同一任务
+阶段是否像示教”，全局1–99%覆盖率衡量“是否仍在示教状态/动作范围内”，两者含义
+不同。分布接近只能说明部署复现了示教分布，不能单独证明任务成功；应同时报告真机
+成功率和失败类型。
