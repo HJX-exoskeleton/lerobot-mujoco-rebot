@@ -1,0 +1,48 @@
+<mujoco model="reBot AeroHand right ACT cylinder transfer">
+  <!--
+    ACT task scene for the 6-DoF reBot arm + right AeroHand: transfer the red
+    cylinder onto the fixed target disk.  Used by the rebot_aerohand_right_act_sim
+    package (configs/aerohand_act_sim.yaml).
+
+    Composed from the same three components as rebotarm_aerohand_sim_transfer_cube.xml,
+    plus wrist IMU sensors keeping the rebot_act_sim sensor-name contract.
+    This file lives in this directory because MuJoCo resolves the nested
+    relative includes and mesh paths of the arm/hand components correctly only
+    when the top-level file sits next to them.
+  -->
+  <include file="rebotarm_aerohand_scene.xml"/>
+  <include file="rebor_arm_6dof.xml"/>
+  <include file="aerohand_right.xml"/>
+
+  <worldbody>
+    <!-- 40 mm radius / 70 mm half-height cylinder resting on the tabletop. -->
+    <body name="box" pos="0.30 -0.10 0.07">
+      <joint name="red_box_joint" type="free" damping="0.1" frictionloss="0.02"/>
+      <inertial pos="0 0 0" mass="0.075"
+                diaginertia="0.000042344 0.000042344 0.000023438"/>
+      <geom name="red_box" type="cylinder" size="0.02 0.07"
+            rgba="0.9 0.08 0.06 1"
+            condim="4" friction="1.1 0.02 0.001"
+            solref="0.008 1" solimp="0.95 0.99 0.001" priority="1"/>
+    </body>
+
+    <!-- Fixed circular goal region on the opposite side.  Collision is
+         enabled here in the XML itself: mujoco 3.11 ignores runtime edits to
+         geom_contype/geom_conaffinity, so a runtime-only switch would leave
+         the disk phantom and the success contact check could never fire. -->
+    <body name="target_box" pos="0.30 0.20 0.003">
+      <geom name="target_box" type="cylinder" size="0.10 0.003"
+            contype="1" conaffinity="1" group="0"
+            rgba="0.58 0.58 0.58 0.8"/>
+    </body>
+  </worldbody>
+
+  <sensor>
+    <!-- Wrist IMU attached to the existing grasp_site on tetheria_mount, so
+         it moves rigidly with the hand frame.  Sensor names keep the
+         rebot_act_sim contract. -->
+    <framequat name="orientation_left" objtype="site" objname="imu_hand_site"/>
+    <gyro name="ang_vel_left" site="imu_hand_site"/>
+    <accelerometer name="accel_left" site="imu_hand_site"/>
+  </sensor>
+</mujoco>

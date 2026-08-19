@@ -1,0 +1,87 @@
+"""Validate metadata and every decoded frame in a simulation dataset."""
+
+from __future__ import annotations
+
+import argparse
+import json
+
+import numpy as np
+from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+
+from rebot_aerohand_right_act_sim.config import DEFAULT_CONFIG, load_config, resolve_project_path
+from rebot_aerohand_right_act_sim.schema import POLICY_FEATURE_KEYS, validate_frame
+
+_AUXILIARY_KEYS = (
+    "sensor.joint_velocity",
+    "sensor.hand_feedback",
+    "sensor.hand_joint_position",
+    "sensor.imu",
+    "sensor.hand_contact",
+    "sensor.sim_time",
+    "episode.object_initial_position",
+)
+
+
+def inspect(config_path: str) -> dict:
+    raw = load_config(config_path)
+    cfg = raw["dataset"]
+    root = resolve_project_path(cfg["root"])
+    dataset = LeRobotDataset(str(cfg["repo_id"]), root=root)
+    ranges: dict[str, dict[str, float]] = {}
+    zero_contact = 0
+    for index in range(len(dataset)):
+        sample = dataset[index]
+        frame = {}
+        for key in POLICY_FEATURE_KEYS:
+            value = sample[key]
+            if key.startswith("observation.") and value.ndim == 3:
+                frame[key] = (
+                    value.permute(1, 2, 0).mul(255).round().clamp(0, 255).byte().numpy()
+                )
+            else:
+                frame[key] = value.numpy().astype(np.float32)
+        for key in _AUXILIARY_KEYS:
+            expected = np.float64 if key == "sensor.sim_time" else np.float32
+            value = sample[key].numpy().astype(expected)
+            # LeRobot decodes one-element numeric features as scalar tensors.
+            frame[key] = value.reshape(1) if key == "sensor.sim_time" else value
+        validate_frame(frame)
+        if not np.any(frame["sensor.hand_contact"]):
+            zero_contact += 1
+        for key in (
+            "observation.state",
+            "action",
+            "sensor.imu",
+            "sensor.hand_contact",
+            "sensor.hand_feedback",
+            "sensor.hand_joint_position",
+        ):
+            value = np.asarray(frame[key], dtype=np.float64)
+            item = ranges.setdefault(key, {"min": float("inf"), "max": float("-inf")})
+            item["min"] = min(item["min"], float(value.min()))
+            item["max"] = max(item["max"], float(value.max()))
+    return {
+        "root": str(root),
+        "episodes": dataset.num_episodes,
+        "frames": len(dataset),
+        "fps": dataset.fps,
+        "zero_hand_contact_frames": zero_contact,
+        "ranges": ranges,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--json-report")
+    args = parser.parse_args()
+    report = inspect(args.config)
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    if args.json_report:
+        path = resolve_project_path(args.json_report)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,52 @@
+dataset:
+  repo_id: rebot_aerohand_right_sim/rebot_act_cylinder
+  root: ./data_aerohand_act_sim/rebot_act_cylinder
+  task: transfer_cylinder_to_target_disk
+  fps: 50
+
+environment:
+  xml: ./asset_rebot_aerohand_right/mujoco_xml/rebotarm_aerohand_act_cylinder.xml
+  seed: 0
+  success_hold_seconds: 0.5
+  object_randomization:
+    target_object_position_center: [0.30, -0.10, 0.07]
+    target_object_xy_half_range: [0.03, 0.03]
+  teleop:
+    motion_alpha: 0.25
+    hand_command_alpha: 0.25
+  # Picture-in-picture camera views stacked in the top-right corner of the
+  # MuJoCo window (like the agent/egocentric PIP views of rebot_act_sim).
+  camera_overlays: [top, cam_wrist]
+  hand_contact_processing:
+    regions: [thumb, index, middle, ring, pinky, palm]
+    clip_max: 25.0
+    temporal_ema_alpha: 0.25
+    visualization_color_max: 15.0
+
+policy:
+  type: act
+  chunk_size: 50
+  n_action_steps: 25
+  vision_backbone: resnet18
+  pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+  use_vae: true
+  latent_dim: 32
+  kl_weight: 10.0
+  temporal_ensemble_coeff: null
+  device: cuda
+
+multimodal:
+  use_imu: false
+  use_hand_contact: false
+  sensor_embed_dim: 64
+
+training:
+  output_dir: ./rebot_aerohand_right_act_sim/ckpt/act_sim_aerohand_cylinder
+  steps: 8000
+  batch_size: 4
+  num_workers: 8
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  seed: 42
+  log_freq: 50
+  save_freq: 2000
