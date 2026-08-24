@@ -1,36 +1,146 @@
-<mujoco model="reBot-DevArm_AeroHand_Right">
-  <!-- Component definitions are merged by MuJoCo at load time. -->
-  <include file="rebor_arm_6dof.xml"/>
+<mujoco model="reBot-B601-colored-AeroHand-right">
+  <!-- Official B601 arm; the calibrated AeroHand mount is retained.
+       Include the hand's defaults/assets/actuators here so this file is also
+       This is the complete standalone arm + hand model and is also reused by
+       the task entry models. -->
   <include file="aerohand_right.xml"/>
+
+  <compiler angle="radian" meshdir="assets" inertiafromgeom="auto" autolimits="true"/>
+  <option timestep="0.0025" iterations="100" noslip_iterations="20" tolerance="1e-10" solver="Newton" jacobian="dense" cone="elliptic"/>
+
+  <asset>
+    <!-- 3x4 cubemap: unused black tiles are ignored by this face layout. -->
+    <texture name="desert_skybox" type="skybox" file="assets/desert.png" gridsize="3 4" gridlayout=".U..LFRB.D.."/>
+
+    <mesh name="base_link_hardware_black_mesh" file="rebot_b601_colored/colored_base_link_hardware_black.stl"/>
+    <mesh name="base_link_matte_black_mesh" file="rebot_b601_colored/colored_base_link_matte_black.stl"/>
+    <mesh name="base_link_silver_trim_mesh" file="rebot_b601_colored/colored_base_link_silver_trim.stl"/>
+    <mesh name="link1_anodized_grey_mesh" file="rebot_b601_colored/colored_link1_anodized_grey.stl"/>
+    <mesh name="link1_hardware_black_mesh" file="rebot_b601_colored/colored_link1_hardware_black.stl"/>
+    <mesh name="link1_matte_black_mesh" file="rebot_b601_colored/colored_link1_matte_black.stl"/>
+    <mesh name="link2_anodized_grey_mesh" file="rebot_b601_colored/colored_link2_anodized_grey.stl"/>
+    <mesh name="link2_hardware_black_mesh" file="rebot_b601_colored/colored_link2_hardware_black.stl"/>
+    <mesh name="link2_matte_black_mesh" file="rebot_b601_colored/colored_link2_matte_black.stl"/>
+    <mesh name="link2_seeed_yellow_mesh" file="rebot_b601_colored/colored_link2_seeed_yellow.stl"/>
+    <mesh name="link3_anodized_grey_mesh" file="rebot_b601_colored/colored_link3_anodized_grey.stl"/>
+    <mesh name="link3_hardware_black_mesh" file="rebot_b601_colored/colored_link3_hardware_black.stl"/>
+    <mesh name="link3_matte_black_mesh" file="rebot_b601_colored/colored_link3_matte_black.stl"/>
+    <mesh name="link3_seeed_yellow_mesh" file="rebot_b601_colored/colored_link3_seeed_yellow.stl"/>
+    <mesh name="link4_anodized_grey_mesh" file="rebot_b601_colored/colored_link4_anodized_grey.stl"/>
+    <mesh name="link4_hardware_black_mesh" file="rebot_b601_colored/colored_link4_hardware_black.stl"/>
+    <mesh name="link4_matte_black_mesh" file="rebot_b601_colored/colored_link4_matte_black.stl"/>
+    <mesh name="link4_seeed_yellow_mesh" file="rebot_b601_colored/colored_link4_seeed_yellow.stl"/>
+    <mesh name="link5_anodized_grey_mesh" file="rebot_b601_colored/colored_link5_anodized_grey.stl"/>
+    <mesh name="link5_hardware_black_mesh" file="rebot_b601_colored/colored_link5_hardware_black.stl"/>
+    <mesh name="link5_matte_black_mesh" file="rebot_b601_colored/colored_link5_matte_black.stl"/>
+    <mesh name="link6_hardware_black_mesh" file="rebot_b601_colored/colored_link6_hardware_black.stl"/>
+    <mesh name="link6_matte_black_mesh" file="rebot_b601_colored/colored_link6_matte_black.stl"/>
+
+    <material name="anodized_grey_mat" rgba="0.50 0.54 0.51 1" specular="0.28" shininess="0.24"/>
+    <material name="hardware_black_mat" rgba="0.055 0.065 0.060 1" specular="0.50" shininess="0.72"/>
+    <material name="matte_black_mat" rgba="0.14 0.16 0.15 1" specular="0.42" shininess="0.48"/>
+    <material name="seeed_yellow_mat" rgba="0.73 0.84 0.12 1" specular="0.22" shininess="0.26"/>
+    <material name="silver_trim_mat" rgba="0.72 0.76 0.73 1" specular="0.72" shininess="0.90"/>
+
+    <!-- Materials consumed by rebotarm_aerohand_scene.xml. -->
+    <texture builtin="checker" height="100" name="texplane" rgb1="0.6 0.6 0.6"
+             rgb2="0.8 0.8 0.8" type="2d" width="100"/>
+    <material name="MatPlane" reflectance="0.5" shininess="1" specular="1"
+              texrepeat="60 60" texture="texplane"/>
+    <texture name="wood_texture" type="2d" file="assets/wood.png"/>
+    <material name="wood" texture="wood_texture"/>
+  </asset>
+
+  <default>
+    <joint damping="0.8" armature="0.01" limited="true"/>
+    <default class="rebot_visual">
+      <geom type="mesh" contype="0" conaffinity="0" density="0"/>
+    </default>
+  </default>
+
+  <visual>
+    <map fogstart="2.5" fogend="7" force="0.1" znear="0.05"/>
+    <quality shadowsize="4096" offsamples="4"/>
+    <headlight diffuse="0.72 0.70 0.66" ambient="0.30 0.31 0.33" specular="0.18 0.18 0.17"/>
+    <rgba haze="0.72 0.76 0.84 1"/>
+  </visual>
 
   <worldbody>
     <light name="spotlight" mode="targetbodycom" target="palm" pos="3 0 4"/>
+
+    <!-- x=-0.1 is the existing task-scene placement, not part of arm kinematics. -->
+    <body name="base_link" pos="-0.1 0 0">
+      <inertial pos="-0.000007849 -0.0000011531 0.029841" mass="0.8366" diaginertia="0.00133040 0.00213119 0.00275877"/>
+      <geom name="base_link_hardware_black_visual" class="rebot_visual" mesh="base_link_hardware_black_mesh" material="hardware_black_mat"/>
+      <geom name="base_link_matte_black_visual" class="rebot_visual" mesh="base_link_matte_black_mesh" material="matte_black_mat"/>
+      <geom name="base_link_silver_trim_visual" class="rebot_visual" mesh="base_link_silver_trim_mesh" material="silver_trim_mat"/>
+
+      <body name="link1" pos="-0.00008416 0 0.08465">
+        <joint name="joint1" type="hinge" axis="0 0 1" range="-2.8 2.8" damping="7.0"/>
+        <inertial pos="0.0001136146 -0.0006163195 0.0236476373" mass="0.1613" diaginertia="0.00025207 0.00015464 0.00023416"/>
+        <geom name="link1_anodized_grey_visual" class="rebot_visual" mesh="link1_anodized_grey_mesh" material="anodized_grey_mat"/>
+        <geom name="link1_hardware_black_visual" class="rebot_visual" mesh="link1_hardware_black_mesh" material="hardware_black_mat"/>
+        <geom name="link1_matte_black_visual" class="rebot_visual" mesh="link1_matte_black_mesh" material="matte_black_mat"/>
+
+        <body name="link2" pos="0.020084 0.031625 0.05555" quat="0.7071054825 -0.7071080799 0 0">
+          <joint name="joint2" type="hinge" axis="0 0 -1" range="-3.14 0" damping="7.0"/>
+          <inertial pos="-0.1322562231 -0.0030617036 -0.0308306967" mass="1.3266" diaginertia="0.00073374 0.01255987 0.01281387"/>
+          <geom name="link2_anodized_grey_visual" class="rebot_visual" mesh="link2_anodized_grey_mesh" material="anodized_grey_mat"/>
+          <geom name="link2_hardware_black_visual" class="rebot_visual" mesh="link2_hardware_black_mesh" material="hardware_black_mat"/>
+          <geom name="link2_matte_black_visual" class="rebot_visual" mesh="link2_matte_black_mesh" material="matte_black_mat"/>
+          <geom name="link2_seeed_yellow_visual" class="rebot_visual" mesh="link2_seeed_yellow_mesh" material="seeed_yellow_mat"/>
+
+          <body name="link3" pos="-0.264 0 0">
+            <joint name="joint3" type="hinge" axis="0 0 1" range="-3.14 0" damping="5.5"/>
+            <inertial pos="0.1210400358 -0.0536211077 -0.0310137855" mass="0.8353" diaginertia="0.00046807 0.00632695 0.00648221"/>
+            <geom name="link3_anodized_grey_visual" class="rebot_visual" mesh="link3_anodized_grey_mesh" material="anodized_grey_mat"/>
+            <geom name="link3_hardware_black_visual" class="rebot_visual" mesh="link3_hardware_black_mesh" material="hardware_black_mat"/>
+            <geom name="link3_matte_black_visual" class="rebot_visual" mesh="link3_matte_black_mesh" material="matte_black_mat"/>
+            <geom name="link3_seeed_yellow_visual" class="rebot_visual" mesh="link3_seeed_yellow_mesh" material="seeed_yellow_mat"/>
+
+            <body name="link4" pos="0.2426 -0.054 -0.001625">
+              <joint name="joint4" type="hinge" axis="0 0 1" range="-1.87 1.57" damping="2.5"/>
+              <inertial pos="0.0608200956 -0.0511711907 -0.0302994586" mass="0.52" diaginertia="0.00045986 0.00075258 0.00066742"/>
+              <geom name="link4_anodized_grey_visual" class="rebot_visual" mesh="link4_anodized_grey_mesh" material="anodized_grey_mat"/>
+              <geom name="link4_hardware_black_visual" class="rebot_visual" mesh="link4_hardware_black_mesh" material="hardware_black_mat"/>
+              <geom name="link4_matte_black_visual" class="rebot_visual" mesh="link4_matte_black_mesh" material="matte_black_mat"/>
+              <geom name="link4_seeed_yellow_visual" class="rebot_visual" mesh="link4_seeed_yellow_mesh" material="seeed_yellow_mat"/>
+
+              <body name="link5" pos="0.078308 -0.0375 -0.03" quat="0.7071054825 -0.7071080799 0 0">
+                <joint name="joint5" type="hinge" axis="0 0 1" range="-1.57 1.57" damping="1.8"/>
+                <inertial pos="-0.0050280206 0.0000017387 0.0386233236" mass="0.383" diaginertia="0.00019772 0.00021737 0.00017191"/>
+                <geom name="link5_anodized_grey_visual" class="rebot_visual" mesh="link5_anodized_grey_mesh" material="anodized_grey_mat"/>
+                <geom name="link5_hardware_black_visual" class="rebot_visual" mesh="link5_hardware_black_mesh" material="hardware_black_mat"/>
+                <geom name="link5_matte_black_visual" class="rebot_visual" mesh="link5_matte_black_mesh" material="matte_black_mat"/>
+
+                <body name="link6" pos="0.028008 0 0.04" quat="0.7071054825 0 0.7071080799 0">
+                  <joint name="joint6" type="hinge" axis="0 0 1" range="-3.14 3.14" damping="1.4"/>
+                  <inertial pos="0.0000037642 -0.0001009088 0.0253308606" mass="0.3663" diaginertia="0.00015554 0.00015554 0.00013966"/>
+                  <!-- link6 visuals intentionally hidden: the official wrist shell overlaps
+                       the existing calibrated AeroHand mount in this combined model. -->
+                  <include file="aerohand_right_body.xml"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
   </worldbody>
 
-  <keyframe>
-    <!-- Key 0: closed grasp pose; controls keep the tendon actuators pulling closed. -->
-    <key name="closed"
-         qpos="0 0 0 0 0 0
-               1.5 1.5 1.5
-               1.5 1.5 1.5
-               1.5 1.5 1.5
-               1.5 1.5 1.5
-               1.5 0.85 1.4 1.4"
-         ctrl="0 0 0 0 0 0
-               0.058520 0.058520 0.058520 0.058520
-               1.5 0.026152 0.081568"/>
+  <contact>
+    <exclude body1="link1" body2="base_link"/>
+    <exclude body1="link2" body2="link4"/>
+    <exclude body1="link4" body2="link6"/>
+  </contact>
 
-    <!-- Key 1: fully open hand with zero finger-closing control. -->
-    <key name="open"
-         qpos="0 0 0 0 0 0
-               0 0 0
-               0 0 0
-               0 0 0
-               0 0 0
-               0 0 0 0"
-         ctrl="0 0 0 0 0 0
-               0.110387 0.110387 0.110387 0.110387
-               0 0.038389 0.112138"/>
-  </keyframe>
+  <actuator>
+    <position name="joint1_position" joint="joint1" kp="140" ctrlrange="-2.8 2.8" forcerange="-30 30"/>
+    <position name="joint2_position" joint="joint2" kp="140" ctrlrange="-3.14 0" forcerange="-30 30"/>
+    <position name="joint3_position" joint="joint3" kp="110" ctrlrange="-3.14 0" forcerange="-30 30"/>
+    <position name="joint4_position" joint="joint4" kp="55" ctrlrange="-1.87 1.57" forcerange="-30 30"/>
+    <position name="joint5_position" joint="joint5" kp="38" ctrlrange="-1.57 1.57" forcerange="-30 30"/>
+    <position name="joint6_position" joint="joint6" kp="28" ctrlrange="-3.14 3.14" forcerange="-30 30"/>
+  </actuator>
 
 </mujoco>

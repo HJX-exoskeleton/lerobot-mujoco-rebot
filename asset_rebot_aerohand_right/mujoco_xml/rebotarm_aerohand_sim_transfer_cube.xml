@@ -1,12 +1,10 @@
 <mujoco model="reBot-AeroHand-transfer-cube">
   <!--
-    Include the same two components used by rebot_arm_right_hand.xml directly.
-    Its 22-qpos keyframes cannot be included in this 29-qpos model after the
-    free cube is added, so task-complete keyframes are defined below instead.
+    Include the complete arm + hand model. Task-complete keyframes are defined
+    below because this scene also adds a free object.
   -->
   <include file="rebotarm_aerohand_scene.xml"/>
-  <include file="rebor_arm_6dof.xml"/>
-  <include file="aerohand_right.xml"/>
+  <include file="rebot_arm_right_hand.xml"/>
 
   <worldbody>
     <!-- 50 mm diameter, 70 mm tall cylinder resting on the tabletop. -->

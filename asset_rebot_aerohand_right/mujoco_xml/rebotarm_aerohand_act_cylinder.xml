@@ -4,15 +4,14 @@
     cylinder onto the fixed target disk.  Used by the rebot_aerohand_right_act_sim
     package (configs/aerohand_act_sim.yaml).
 
-    Composed from the same three components as rebotarm_aerohand_sim_transfer_cube.xml,
+    Composed from the same scene and complete robot component as rebotarm_aerohand_sim_transfer_cube.xml,
     plus wrist IMU sensors keeping the rebot_act_sim sensor-name contract.
     This file lives in this directory because MuJoCo resolves the nested
     relative includes and mesh paths of the arm/hand components correctly only
     when the top-level file sits next to them.
   -->
   <include file="rebotarm_aerohand_scene.xml"/>
-  <include file="rebor_arm_6dof.xml"/>
-  <include file="aerohand_right.xml"/>
+  <include file="rebot_arm_right_hand.xml"/>
 
   <worldbody>
     <!-- 40 mm radius / 70 mm half-height cylinder resting on the tabletop. -->

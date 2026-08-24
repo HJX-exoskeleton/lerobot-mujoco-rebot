@@ -7,19 +7,29 @@
 ## 目录结构
 
 ```text
-rebot_aerohand_right/
+asset_rebot_aerohand_right/
 ├── aero_hand_right_cv_control_sim.py       # 摄像头手势到仿真灵巧手的映射程序
 ├── README.md
 └── mujoco_xml/
-    ├── rebot_arm_right_hand.xml            # 推荐加载的完整组合模型
-    ├── rebor_arm_6dof.xml                  # reBot 机械臂定义
+    ├── rebot_arm_right_hand.xml            # 推荐加载的机械臂 + AeroHand 展示模型
+    ├── rebor_arm_6dof.xml                  # 可独立加载的纯官方 B601 六轴机械臂
     ├── aerohand_right.xml                  # 灵巧手资产、肌腱、执行器和约束
     ├── aerohand_right_body.xml             # 直接安装在 link6 下的手部 body 树
-    ├── assets/                             # AeroHand 网格
-    └── rebot_6dof/                         # reBot 网格和纹理
+    ├── rebotarm_aerohand_scene.xml         # 桌面、灯光和相机定义
+    ├── rebotarm_aerohand_sim_transfer_cube.xml # 带自由物体的搬运任务模型
+    ├── rebotarm_aerohand_act_cylinder.xml  # 带手背 IMU 输出的任务入口
+    └── assets/                             # AeroHand 网格、官方 B601 分色网格及场景纹理
 ```
 
-组合模型使用 `include` 加载机械臂和灵巧手公共定义。`tetheria_mount` 是 `link6` 的直接子 body，不使用 `freejoint` 或 `weld`，因此模型具有真实的 22 个关节位置自由度：机械臂 6 个、灵巧手 16 个。
+`rebor_arm_6dof.xml` 是纯机械臂入口，直接拖入 MuJoCo 时只显示 B601，模型维度为 `nq=6`、`nu=6`。它保留完整的官方 `link6` 外观。
+
+`rebot_arm_right_hand.xml` 直接包含完整的 B601 与 AeroHand 组合模型，并可由搬运任务场景继续引用。组合模型中的 `tetheria_mount` 是 `link6` 的直接子 body，不使用 `freejoint` 或 `weld`，因此具有 22 个关节位置自由度：机械臂 6 个、灵巧手 16 个。
+
+机械臂部分以 `asset_rebotarm_b601_colored` 为基准，使用官方分色网格、质量惯量、关节阻尼、运动范围及位置执行器参数；AeroHand 安装变换和手部模型保持不变。任务场景中的底座位置 `x=-0.1 m` 属于场景摆放参数，不改变机械臂内部坐标链。
+
+由于官方 `link6` 外壳与现有 AeroHand 安装座发生视觉重叠，只有组合模型 `rebot_arm_right_hand.xml` 隐藏了 `link6` 的两个可视 mesh；纯机械臂入口仍显示完整外壳。两者都保留 `link6` 刚体、`joint6`、官方惯量和第六路执行器，因此该处理不改变机械臂自由度或动力学拓扑。
+
+组合模型使用 `mujoco_xml/assets/desert.png` 的 3×4 cubemap 作为天空背景，并针对该背景调整了环境光、镜面光和远景雾效。
 
 ## 环境依赖
 
@@ -41,7 +51,7 @@ pip install mujoco mediapipe opencv-python numpy
 在当前工作区根目录执行：
 
 ```bash
-python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
+python3 asset_rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
   --start-enabled \
   --gl-mode hardware
 ```
@@ -49,7 +59,7 @@ python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
 脚本默认加载：
 
 ```text
-xml/rebot_aerohand_right/mujoco_xml/rebot_arm_right_hand.xml
+asset_rebot_aerohand_right/mujoco_xml/rebot_arm_right_hand.xml
 ```
 
 如果不使用 `--start-enabled`，程序启动后视觉控制处于暂停状态，需要在 OpenCV 摄像头窗口中按空格启用。
@@ -144,12 +154,11 @@ ctrl = open_ctrl + closure_ratio * (closed_ctrl - open_ctrl)
 
 ## XML 关键帧
 
-`rebot_arm_right_hand.xml` 包含两个关键帧：
+组合模型 `rebot_arm_right_hand.xml` 不定义关键帧，避免它被带有额外自由物体的任务 XML 引用时产生不完整状态。
 
-- `Key 0 = closed`
-- `Key 1 = open`
+`rebotarm_aerohand_sim_transfer_cube.xml` 保留包含完整机器人与自由物体位姿的 `task_ready` 和 `task_closed` 关键帧。
 
-在 MuJoCo 原生界面的 `Simulation` 面板中选择 Key，然后点击 `Load key` 即可切换。关键帧中的控制量与视觉程序使用的打开/闭合端点一致。
+在视觉程序中可直接按 `O` 和 `C` 测试灵巧手打开与闭合，不依赖 XML 关键帧。
 
 ## 性能与线程设计
 
@@ -181,7 +190,7 @@ ctrl = open_ctrl + closure_ratio * (closed_ctrl - open_ctrl)
 查看全部参数：
 
 ```bash
-python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py --help
+python3 asset_rebot_aerohand_right/aero_hand_right_cv_control_sim.py --help
 ```
 
 常用参数：
@@ -212,7 +221,7 @@ python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py --help
 一般使用：
 
 ```bash
-python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
+python3 asset_rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
   --start-enabled \
   --gl-mode hardware \
   --vision-hz 20 \
@@ -222,7 +231,7 @@ python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
 CPU 性能有限或界面仍卡顿：
 
 ```bash
-python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
+python3 asset_rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
   --start-enabled \
   --gl-mode hardware \
   --vision-hz 15 \
@@ -233,7 +242,7 @@ python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
 真人手已经张开，但仿真手仍有小幅弯曲：
 
 ```bash
-python3 xml/rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
+python3 asset_rebot_aerohand_right/aero_hand_right_cv_control_sim.py \
   --start-enabled \
   --open-deadband 0.15 \
   --response-gamma 1.5
@@ -341,6 +350,20 @@ mujoco_xml/aerohand_right_body.xml
 ```
 
 第三个 `pos` 分量控制沿机械臂末端轴线的距离。数值每减少 `0.001`，灵巧手靠近机械臂约 `1 mm`。直接嵌套结构不需要同步修改关键帧或其他 XML。
+
+## 手背 IMU
+
+手背 IMU 的安装坐标保存在 `mujoco_xml/aerohand_right_body.xml`：
+
+```xml
+<site name="imu_hand_site" pos="0.06 0.01 -0.06" euler="3.14 -0.36 0"/>
+```
+
+默认入口 `rebot_arm_right_hand.xml` 保留该 site，但不注册 IMU 输出。需要姿态、角速度和线加速度数据时，使用 `rebotarm_aerohand_act_cylinder.xml` 中连接到该 site 的三个传感器：
+
+- `orientation_left`：手背姿态四元数；
+- `ang_vel_left`：手背角速度；
+- `accel_left`：手背线加速度。
 
 ## 验证建议
 
