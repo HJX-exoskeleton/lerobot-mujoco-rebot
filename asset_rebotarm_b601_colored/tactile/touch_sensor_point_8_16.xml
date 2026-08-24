@@ -1,6 +1,6 @@
 <mujocoinclude model="touch sensor ponit 8 * 16">
 
-  <force name="touch_point_left_000" site="touch_point_left_000" />
+    <force name="touch_point_left_000" site="touch_point_left_000" />
     <force name="touch_point_left_001" site="touch_point_left_001" />
     <force name="touch_point_left_002" site="touch_point_left_002" />
     <force name="touch_point_left_003" site="touch_point_left_003" />
