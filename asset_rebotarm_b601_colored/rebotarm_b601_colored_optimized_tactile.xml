@@ -5,7 +5,7 @@
   <size memory="500M"/>
   <!-- A smaller step and a few no-slip iterations prevent the two slides from
        exchanging an impulse when a pad first touches the object. -->
-  <option timestep='0.0025' iterations="100" noslip_iterations="40" tolerance="1e-8" solver="Newton" jacobian="dense" cone="elliptic"/>
+  <option iterations="100" noslip_iterations="40" tolerance="1e-8" solver="Newton" jacobian="dense" cone="elliptic"/>
 
   <!-- add tactile -->
   <extension>

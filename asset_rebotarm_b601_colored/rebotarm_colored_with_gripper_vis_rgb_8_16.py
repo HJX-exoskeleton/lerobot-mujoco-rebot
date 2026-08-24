@@ -13,7 +13,7 @@ from pathlib import Path
 
 import cv2
 import glfw
-import mujoco  # pip install mujoco==3.6.0
+import mujoco  # pip install mujoco==3.11.0
 import mujoco.viewer
 import numpy as np
 
@@ -454,11 +454,23 @@ def servo_reader_worker(scs, state_lock, shared_state, read_rate, no_gripper, g_
 # ============================================================
 # 7. 仿真主进程 (接管物理与控制流)
 # ============================================================
+def enable_multiccd(model):
+    """Enable MultiCCD across MuJoCo versions with old/new flag layouts."""
+    enable_bit = getattr(mujoco.mjtEnableBit, "mjENBL_MULTICCD", None)
+    if enable_bit is not None:
+        model.opt.enableflags |= int(enable_bit)
+        return
+
+    disable_bit = getattr(mujoco.mjtDisableBit, "mjDSBL_MULTICCD", None)
+    if disable_bit is not None:
+        model.opt.disableflags &= ~int(disable_bit)
+
+
 def simulation_process(args, frame_queue: mp.Queue, stop_event: mp.Event):
     print("[SIM] 加载模型与初始化...")
     model = load_model_with_extra_arena(args.xml)
     taxel_counts, backing_count = disable_taxel_collisions(model)
-    model.opt.enableflags |= int(mujoco.mjtEnableBit.mjENBL_MULTICCD)
+    enable_multiccd(model)
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
 
