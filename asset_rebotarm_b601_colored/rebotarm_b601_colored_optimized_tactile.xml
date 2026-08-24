@@ -7,11 +7,6 @@
        exchanging an impulse when a pad first touches the object. -->
   <option iterations="100" noslip_iterations="40" tolerance="1e-8" solver="Newton" jacobian="dense" cone="elliptic"/>
 
-  <!-- add tactile -->
-  <extension>
-    <plugin plugin="mujoco.sensor.touch_grid"/>
-  </extension>
-
   <visual>
     <headlight diffuse="0.65 0.65 0.65" ambient="0.25 0.25 0.25" specular="0.2 0.2 0.2"/>
     <rgba haze="0.15 0.18 0.20 1"/>
