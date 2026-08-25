@@ -35,15 +35,15 @@
           material="groundplane"/>
     <body name="body_obj_mug_5" pos="0.32 0.08 0.82">
 <!--      <freejoint/>-->
-      <joint name="body_obj_mug_5_free" type="free" damping="0.01" frictionloss="0.01"/>
+      <joint name="body_obj_mug_5_free" type="free" damping="0.001" frictionloss="0.001"/>
       <!-- 4 cm cube, 100 g. The explicit inertia must be updated together
            with geom mass; otherwise MuJoCo keeps using the old body mass. -->
-      <inertial pos="0 0 0" mass="0.25" diaginertia="2.667e-5 2.667e-5 2.667e-5"/>
+      <inertial pos="0 0 0" mass="0.05" diaginertia="2.667e-5 2.667e-5 2.667e-5"/>
       <geom
         name="geom_obj_red_cube"
         type="box"
         size="0.02 0.02 0.02"
-        mass="0.25"
+        mass="0.05"
         rgba="1 0 0 1"
         condim="3"
         friction="1.2 0.01 0.001"
