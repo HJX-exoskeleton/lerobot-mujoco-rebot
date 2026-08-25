@@ -80,15 +80,69 @@ def _tactile_heatmap(
     height: int,
     scale: float,
 ) -> np.ndarray:
-    # Pressure projection intentionally spreads force over the contact patch;
-    # sqrt contrast keeps low but meaningful taxel loads visible without
-    # changing the stored values or policy inputs.
-    normalized = np.sqrt(
-        np.clip(np.maximum(value, 0.0) / max(scale, 1e-6), 0.0, 1.0)
+    # Match the official B601 tactile viewer: linear VIRIDIS mapping with
+    # nearest-neighbour taxel enlargement (no nonlinear contrast transform).
+    normalized = np.clip(np.maximum(value, 0.0) / max(scale, 1e-6), 0.0, 1.0)
+    bgr = cv2.applyColorMap(
+        (normalized * 255).astype(np.uint8), cv2.COLORMAP_VIRIDIS
     )
-    bgr = cv2.applyColorMap((normalized * 255).astype(np.uint8), cv2.COLORMAP_TURBO)
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
     return cv2.resize(rgb, (width, height), interpolation=cv2.INTER_NEAREST)
+
+
+def _reference_tactile_image(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    """Independent B601 pad images in the new XML's physical orientation.
+
+    The sensor tensor remains reference-compatible [8, 16].  Only the display
+    is transformed: the 16-point finger-length axis becomes image height, and
+    the opposing pads are oriented so their fingertip ends are both at the
+    bottom of the final MuJoCo overlay.  Do not average the opposing pads:
+    doing so duplicates two displaced cylinder generatrices into both panels.
+    """
+    left_display = np.flipud(np.nan_to_num(left).clip(0, 1).T)
+    right_display = np.nan_to_num(right).clip(0, 1).T
+
+    def panel(value: np.ndarray, label: str, mirror: bool = False) -> np.ndarray:
+        image = cv2.applyColorMap(
+            (value * 255).astype(np.uint8), cv2.COLORMAP_VIRIDIS
+        )
+        image = cv2.resize(image, (160, 320), interpolation=cv2.INTER_NEAREST)
+        if mirror:
+            image = cv2.flip(image, 1)
+        cv2.putText(
+            image,
+            label,
+            (8, 24),
+            cv2.FONT_HERSHEY_TRIPLEX,
+            0.62,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+        return image
+
+    bgr = np.hstack(
+        (panel(left_display, "left"), panel(right_display, "right", True))
+    )
+    cv2.line(
+        bgr,
+        (bgr.shape[1] // 2, 0),
+        (bgr.shape[1] // 2, bgr.shape[0]),
+        (255, 255, 255),
+        2,
+    )
+    # cv2.imshow in the reference consumes BGR; MuJoCo mjr_drawPixels consumes RGB.
+    return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+
+def _stabilize_distance_map(
+    value: np.ndarray, previous: np.ndarray | None
+) -> np.ndarray:
+    """Exact per-taxel display EMA used by the B601 auto-grasp demo."""
+    value = np.nan_to_num(value).clip(0, 1).astype(np.float32, copy=False)
+    if previous is None:
+        previous = np.zeros_like(value)
+    return (0.25 * value + 0.75 * previous).astype(np.float32, copy=False)
 
 
 class ReplaySensorVisualizer:
@@ -106,10 +160,14 @@ class ReplaySensorVisualizer:
             None if tactile_color_max is None else float(tactile_color_max)
         )
         self.tactile_scale = self.fixed_tactile_scale or 1e-3
+        self._display_left: np.ndarray | None = None
+        self._display_right: np.ndarray | None = None
 
     def reset(self) -> None:
         self.imu_history.clear()
         self.tactile_scale = self.fixed_tactile_scale or 1e-3
+        self._display_left = None
+        self._display_right = None
 
     def render(
         self,
@@ -123,6 +181,8 @@ class ReplaySensorVisualizer:
         imu = np.asarray(imu, dtype=np.float32).reshape(10)
         left = np.asarray(tactile_left, dtype=np.float32).reshape(8, 16)
         right = np.asarray(tactile_right, dtype=np.float32).reshape(8, 16)
+        self._display_left = _stabilize_distance_map(left, self._display_left)
+        self._display_right = _stabilize_distance_map(right, self._display_right)
         self.imu_history.append(imu.copy())
         if self.fixed_tactile_scale is None:
             current_max = max(float(np.max(left)), float(np.max(right)), 1e-6)
@@ -130,7 +190,9 @@ class ReplaySensorVisualizer:
                 current_max, self.tactile_scale * 0.98, 1e-3
             )
 
-        panel = np.full((480, 640, 3), 22, dtype=np.uint8)
+        # Square panel leaves enough vertical space for stacked IMU plots and
+        # the reference-size 320x320 tactile image below them.
+        panel = np.full((640, 640, 3), 22, dtype=np.uint8)
         _text(
             panel,
             f"SYNCHRONIZED SENSORS  frame={frame_index}  t={timestamp:.3f}s",
@@ -143,36 +205,19 @@ class ReplaySensorVisualizer:
         _text(panel, " ".join(f"{item:+.3f}" for item in quat), (14, 72))
         history = np.asarray(self.imu_history, dtype=np.float32)
         _history_plot(
-            panel, history[:, 4:7], x=14, y=84, width=298, height=82, title="GYRO xyz"
+            panel, history[:, 4:7], x=14, y=84, width=612, height=92,
+            title="GYRO xyz"
         )
         _history_plot(
-            panel, history[:, 7:10], x=328, y=84, width=298, height=82, title="ACCEL xyz"
-        )
-        _text(
-            panel,
-            f"gyro now:  {gyro[0]:+.2f}  {gyro[1]:+.2f}  {gyro[2]:+.2f}",
-            (14, 184),
-        )
-        _text(
-            panel,
-            f"accel now: {accel[0]:+.2f}  {accel[1]:+.2f}  {accel[2]:+.2f}",
-            (328, 184),
+            panel, history[:, 7:10], x=14, y=190, width=612, height=92,
+            title="ACCEL xyz"
         )
 
-        heatmap_y, heatmap_h, heatmap_w = 220, 180, 298
-        panel[heatmap_y : heatmap_y + heatmap_h, 14 : 14 + heatmap_w] = _tactile_heatmap(
-            left, width=heatmap_w, height=heatmap_h, scale=self.tactile_scale
+        # Use the official B601 visualization verbatim. No EMA, morphology,
+        # nonlinear contrast or extra thresholding is applied here.
+        panel[320:640, 160:480] = _reference_tactile_image(
+            self._display_left, self._display_right
         )
-        panel[heatmap_y : heatmap_y + heatmap_h, 328 : 328 + heatmap_w] = _tactile_heatmap(
-            right, width=heatmap_w, height=heatmap_h, scale=self.tactile_scale
-        )
-        for x, name, value in ((14, "LEFT 8x16", left), (328, "RIGHT 8x16", right)):
-            maximum, mean, row, column = tactile_metrics(value)
-            center = "no contact" if row < 0 else f"center=({row:.1f},{column:.1f})"
-            _text(panel, name, (x, 214), color=(90, 220, 255))
-            _text(panel, f"max={maximum:.3f} mean={mean:.3f}", (x, 421))
-            _text(panel, center, (x, 443))
-        _text(panel, f"shared tactile color max={self.tactile_scale:.3f}", (14, 470))
         return panel
 
 

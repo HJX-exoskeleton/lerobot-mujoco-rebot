@@ -21,6 +21,30 @@ ARM_NAMES = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
 ACT_NAMES = [f"joint{i}_position" for i in range(1, 7)] + ["gripper_position"]
 
 
+def enable_multiccd_compat(model):
+    """Enable MultiCCD with both the old and new MuJoCo flag layouts.
+
+    Older bindings expose ``mjENBL_MULTICCD`` as an enable bit.  Newer
+    bindings (including MuJoCo 3.11) expose ``mjDSBL_MULTICCD`` instead, so
+    MultiCCD is enabled by clearing that disable bit.
+    """
+    enable_enum = getattr(mujoco, "mjtEnableBit", None)
+    enable_bit = getattr(enable_enum, "mjENBL_MULTICCD", None)
+    if enable_bit is not None:
+        model.opt.enableflags |= int(enable_bit)
+        return "enable-bit"
+
+    disable_enum = getattr(mujoco, "mjtDisableBit", None)
+    disable_bit = getattr(disable_enum, "mjDSBL_MULTICCD", None)
+    if disable_bit is not None:
+        model.opt.disableflags &= ~int(disable_bit)
+        return "disable-bit"
+
+    # Very old MuJoCo versions may not provide MultiCCD at all.  It is an
+    # accuracy enhancement, not a prerequisite for loading/running the model.
+    return "unavailable"
+
+
 def ik(model, site_id, seed, target, iters=500):
     d = mujoco.MjData(model)
     q = np.asarray(seed, dtype=float).copy()
@@ -166,10 +190,11 @@ def tactile_window(left, right, state):
 def manual_main():
     """Interactive diagnostic mode: never overwrite data.ctrl."""
     model = mujoco.MjModel.from_xml_path(str(XML))
+    multiccd_mode = enable_multiccd_compat(model)
     data = mujoco.MjData(model)
     # Manual mode keeps the load-bearing finger collisions, while taxel cells
     # are display-only and are sampled by surface distance.
-    model.opt.enableflags |= int(mujoco.mjtEnableBit.mjENBL_MULTICCD)
+    print(f"[PHYS] MultiCCD compatibility mode: {multiccd_mode}", flush=True)
     obj_geom = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "red_box_collision")
     left = {mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, n)
             for n in ("finger_left_collision", "finger_left_rear_collision")}
@@ -366,7 +391,9 @@ def main():
         manual_main()
         return
     model = mujoco.MjModel.from_xml_path(str(XML))
+    multiccd_mode = enable_multiccd_compat(model)
     data = mujoco.MjData(model)
+    print(f"[PHYS] MultiCCD compatibility mode: {multiccd_mode}", flush=True)
     tactile_present = configure_tactile_surface(model, data, args.tactile_inset)
     print(f"[PHYS] tactile_surface={'present/non-colliding' if tactile_present else 'absent'}, additional_inset={args.tactile_inset:.4f}m")
     acts = np.array([mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, n) for n in ACT_NAMES])

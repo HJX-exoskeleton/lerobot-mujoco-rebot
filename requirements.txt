@@ -1,4 +1,4 @@
-mujoco==3.1.6
+mujoco>=3.1.6,<4
 pyautogui
 matplotlib
 scipy

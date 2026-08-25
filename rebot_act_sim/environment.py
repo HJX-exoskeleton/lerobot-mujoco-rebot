@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import glfw
+import mujoco
 import numpy as np
 from PIL import Image
 
@@ -16,6 +17,8 @@ from .sensors import (
     read_tactile_contact_projection,
     read_imu,
     read_tactile_normal,
+    read_tactile_proximity,
+    tactile_proximity_geom_ids,
 )
 
 JOINT_NAMES = tuple(f"joint{i}" for i in range(1, 7))
@@ -84,7 +87,7 @@ def teleop_delta_from_keys(
     if glfw.KEY_F in repeated_keys:
         dpos[2] -= TRANSLATION_STEP
 
-    # SimpleEnv post-multiplies the rotation, so these are tcp_link-local axes.
+    # SimpleEnv post-multiplies the rotation, so these are tool-body-local axes.
     if glfw.KEY_UP in repeated_keys:
         drpy[1] -= ROTATION_STEP       # pitch forward
     if glfw.KEY_DOWN in repeated_keys:
@@ -119,6 +122,7 @@ class SimACTEnvironment:
         seed: int | None = None,
         success_hold_seconds: float = 0.5,
         control_hz: int = FPS,
+        camera_render_hz: float | None = None,
         plate_position: tuple[float, float, float] | list[float] | None = None,
         target_object_position_center: tuple[float, float, float]
         | list[float]
@@ -131,8 +135,38 @@ class SimACTEnvironment:
     ):
         from mujoco_env.y_env import SimpleEnv
 
-        self.task = SimpleEnv(str(xml_path), action_type="eef_pose", state_type="joint_angle", seed=seed)
+        self.task = SimpleEnv(
+            str(xml_path),
+            action_type="eef_pose",
+            state_type="joint_angle",
+            seed=seed,
+            gripper_joint_name="finger_left",
+            tcp_body_name="end_link",
+            egocentric_camera_name="cam_wrist",
+            tcp_marker_radius=0.01,
+            tcp_marker_site_name="grasp_center",
+        )
+        self._scripted_joint_target: np.ndarray | None = None
+        self._scripted_joint_velocity = np.zeros(len(JOINT_NAMES), dtype=np.float64)
+        # SimpleEnv historically initializes its viewer with black_sky=True.
+        # This task ships an actual desert skybox, so explicitly turn skybox
+        # rendering back on for collection/replay/deployment viewers.
+        self.parser.viewer.scn.flags[mujoco.mjtRndFlag.mjRND_SKYBOX] = True
         self.success_hold_steps = success_hold_steps(success_hold_seconds, control_hz)
+        self.control_hz = int(control_hz)
+        requested_camera_hz = (
+            float(self.control_hz)
+            if camera_render_hz is None
+            else float(camera_render_hz)
+        )
+        if requested_camera_hz <= 0:
+            raise ValueError("camera_render_hz must be positive")
+        self.camera_render_hz = min(requested_camera_hz, float(self.control_hz))
+        self._camera_render_stride = max(
+            1, int(round(float(self.control_hz) / self.camera_render_hz))
+        )
+        self._camera_cache: tuple[np.ndarray, np.ndarray] | None = None
+        self._observation_count = 0
         self._grab_sideview = bool(grab_sideview)
         self._enable_tactile_proc = bool(enable_tactile_processing)
         self.tactile_config = TactileProcessingConfig.from_mapping(
@@ -145,6 +179,19 @@ class SimACTEnvironment:
         self._teleop_motion = np.zeros(6, dtype=np.float32)
         if self._enable_tactile_proc:
             self._configure_tactile_contact_dynamics()
+        self._proximity_object_geom = -1
+        self._proximity_taxel_geoms: dict[str, np.ndarray] = {}
+        if (
+            self._enable_tactile_proc
+            and self.tactile_config.signal_source == "distance_proximity"
+        ):
+            self._proximity_object_geom = int(
+                self.parser.model.geom("geom_obj_red_cube").id
+            )
+            self._proximity_taxel_geoms = {
+                side: tactile_proximity_geom_ids(self.parser.model, side)
+                for side in ("left", "right")
+            }
         self.plate_position = self._position3(plate_position, "plate_position")
         self.target_object_position_center = self._position3(
             target_object_position_center, "target_object_position_center"
@@ -212,9 +259,17 @@ class SimACTEnvironment:
                     ):
                         self.parser.model.geom_contype[geom_index] = 0
                         self.parser.model.geom_conaffinity[geom_index] = 0
+                    elif self.tactile_config.signal_source == "distance_proximity":
+                        # Distance-sensing taxels must never enter MuJoCo's
+                        # collision/contact pipeline.
+                        self.parser.model.geom_contype[geom_index] = 0
+                        self.parser.model.geom_conaffinity[geom_index] = 0
                     self.parser.model.geom_solref[geom_index, 0] = (
                         self.tactile_config.contact_time_constant
                     )
+            if self.tactile_config.signal_source == "distance_proximity":
+                pad.contype[0] = 0
+                pad.conaffinity[0] = 0
 
     def _set_controlled_object_positions(self, seed: int | None) -> None:
         if self.plate_position is None:
@@ -239,6 +294,15 @@ class SimACTEnvironment:
         table = self.parser.model.geom("front_object_table")
         return float(table.pos[2] + table.size[2])
 
+    @staticmethod
+    def _geom_vertical_half_extent(geom) -> float:
+        if int(geom.type[0]) in (
+            int(mujoco.mjtGeom.mjGEOM_CYLINDER),
+            int(mujoco.mjtGeom.mjGEOM_CAPSULE),
+        ):
+            return float(geom.size[1])
+        return float(geom.size[2])
+
     def _set_object_pose_without_step(
         self, target: np.ndarray, plate: np.ndarray
     ) -> None:
@@ -249,7 +313,11 @@ class SimACTEnvironment:
         # step lets gravity establish contact gradually instead of correcting a
         # potentially penetrating pose with a large impulse.
         cube_geom = self.parser.model.geom("geom_obj_red_cube")
-        minimum_z = self._table_top_z() + float(cube_geom.size[2]) + 0.0005
+        minimum_z = (
+            self._table_top_z()
+            + self._geom_vertical_half_extent(cube_geom)
+            + 0.0005
+        )
         target[2] = max(float(target[2]), minimum_z)
         self.parser.set_p_base_body(body_name="body_obj_mug_5", p=target)
         self.parser.set_R_base_body(
@@ -314,6 +382,13 @@ class SimACTEnvironment:
         self._success_count = 0
         self.tactile_processor.reset()
         self._teleop_motion.fill(0)
+        self._camera_cache = None
+        self._observation_count = 0
+        self._scripted_joint_target = np.asarray(
+            self.parser.get_qpos_joints(joint_names=list(JOINT_NAMES)),
+            dtype=np.float64,
+        )
+        self._scripted_joint_velocity.fill(0.0)
 
     def poll_events(self) -> None:
         """Poll GLFW events without rendering (headless mode).
@@ -340,6 +415,8 @@ class SimACTEnvironment:
         self._enforce_plate_lock()
         if not self._enable_tactile_proc:
             return
+        if self.tactile_config.signal_source == "distance_proximity":
+            return
         if self.tactile_config.signal_source == "continuous_contact_projection":
             tactile_left, tactile_right = read_tactile_contact_projection(
                 self.parser,
@@ -358,11 +435,35 @@ class SimACTEnvironment:
         return float(self.parser.get_qpos_joint(self.task.gripper_joint_name)[0])
 
     def observe(self) -> SimObservation:
-        image, wrist = self.task.grab_image(grab_sideview=self._grab_sideview)
+        if (
+            self._camera_cache is None
+            or self._observation_count % self._camera_render_stride == 0
+        ):
+            self._camera_cache = self.task.grab_image(
+                grab_sideview=self._grab_sideview
+            )
+        image, wrist = self._camera_cache
+        self._observation_count += 1
         now = float(self.parser.get_sim_time())
         dt = max(now - self._last_time, 1e-6)
         gripper = self._gripper_position()
         if self._enable_tactile_proc:
+            if self.tactile_config.signal_source == "distance_proximity":
+                proximity = {
+                    side: read_tactile_proximity(
+                        self.parser.model,
+                        self.parser.data,
+                        self._proximity_object_geom,
+                        self._proximity_taxel_geoms[side],
+                        sigma=self.tactile_config.proximity_sigma,
+                        reach=self.tactile_config.proximity_reach,
+                        threshold=self.tactile_config.proximity_threshold,
+                    )
+                    for side in ("left", "right")
+                }
+                self.tactile_processor.update(
+                    proximity["left"], proximity["right"]
+                )
             tactile_left, tactile_right = self.tactile_processor.consume()
         else:
             tactile_left = np.zeros(TACTILE_SHAPE, dtype=np.float32)
@@ -439,6 +540,65 @@ class SimACTEnvironment:
         self.task.action_type = "joint_angle"
         self.task.step(action)
 
+    def scripted_target(
+        self, tool_position: np.ndarray, gripper_closed: float
+    ) -> np.ndarray:
+        """Convert an absolute Cartesian waypoint into the normal 7-D action.
+
+        Orientation remains at the reset/teleoperation target. The returned
+        action is exactly the joint/gripper command sent to the simulator and
+        can therefore be written directly to an ACT demonstration.
+        """
+        tool_position = np.asarray(tool_position, dtype=np.float64)
+        if tool_position.shape != (3,) or not np.all(np.isfinite(tool_position)):
+            raise ValueError("tool_position must contain three finite values")
+        gripper_closed = float(np.clip(gripper_closed, 0.0, 1.0))
+        delta = tool_position - np.asarray(self.task.p0, dtype=np.float64)
+        self.task.action_type = "eef_pose"
+        self.task.step(
+            np.concatenate(
+                [delta, np.zeros(3, dtype=np.float64), [gripper_closed]]
+            )
+        )
+        raw_joint_target = np.asarray(self.task.compute_q, dtype=np.float64)
+        if self._scripted_joint_target is None:
+            self._scripted_joint_target = np.asarray(
+                self.parser.get_qpos_joints(joint_names=list(JOINT_NAMES)),
+                dtype=np.float64,
+            )
+
+        # Numerical IK can occasionally select a noticeably different joint
+        # solution for two adjacent Cartesian targets. Limit both velocity and
+        # acceleration at the 50 Hz command level so this cannot become a
+        # visible one-frame arm jerk.
+        remaining = raw_joint_target - self._scripted_joint_target
+        desired_velocity = np.clip(remaining, -0.03, 0.03)
+        velocity_change = np.clip(
+            desired_velocity - self._scripted_joint_velocity, -0.003, 0.003
+        )
+        velocity = self._scripted_joint_velocity + velocity_change
+        step = velocity.copy()
+        # Decelerate to zero before reversing direction, and do not overshoot
+        # a nearby target.
+        step[step * remaining <= 0.0] = 0.0
+        overshoot = np.abs(step) > np.abs(remaining)
+        step[overshoot] = remaining[overshoot]
+        self._scripted_joint_target = self._scripted_joint_target + step
+        self._scripted_joint_velocity = velocity
+        self._scripted_joint_velocity[overshoot] = step[overshoot]
+
+        # SimpleEnv.step() has already converted the normalized gripper command
+        # to its physical actuator target. Preserve it while replacing the raw
+        # IK jump with the smoothed six-joint command.
+        self.task.compute_q = self._scripted_joint_target.copy()
+        self.task.q[: len(JOINT_NAMES)] = self._scripted_joint_target
+        return np.concatenate(
+            [
+                self._scripted_joint_target.astype(np.float32),
+                np.asarray([gripper_closed], dtype=np.float32),
+            ]
+        )
+
     def render(
         self, *, teleop: bool = False, sensor_panel: np.ndarray | None = None
     ) -> None:
@@ -460,7 +620,7 @@ class SimACTEnvironment:
 
     def check_success(self) -> bool:
         target, plate = self.task.get_obj_pose()
-        tcp, _ = self.parser.get_pR_body(body_name="tcp_link")
+        tcp, _ = self.parser.get_pR_body(body_name=self.task.tcp_body_name)
         placed = (
             np.linalg.norm(target[:2] - plate[:2]) < 0.08
             and -0.02 < float(target[2] - plate[2]) < 0.15

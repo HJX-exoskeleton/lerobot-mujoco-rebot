@@ -18,10 +18,12 @@ TACTILE_PROCESSING_SPEC_NAME = "rebot_sim_tactile_processing.json"
 
 
 def read_imu(parser) -> np.ndarray:
+    sensor_names = set(parser.sensor_names)
+    suffix = "left" if "orientation_left" in sensor_names else "wrist"
     values = [
-        np.asarray(parser.get_sensor_value("orientation_left"), dtype=np.float32),
-        np.asarray(parser.get_sensor_value("ang_vel_left"), dtype=np.float32),
-        np.asarray(parser.get_sensor_value("accel_left"), dtype=np.float32),
+        np.asarray(parser.get_sensor_value(f"orientation_{suffix}"), dtype=np.float32),
+        np.asarray(parser.get_sensor_value(f"ang_vel_{suffix}"), dtype=np.float32),
+        np.asarray(parser.get_sensor_value(f"accel_{suffix}"), dtype=np.float32),
     ]
     imu = np.concatenate(values).astype(np.float32, copy=False)
     if imu.shape != (10,):
@@ -128,20 +130,23 @@ def read_tactile_contact_projection(
 
 @dataclass(frozen=True)
 class TactileProcessingConfig:
-    signal_source: str = "continuous_contact_projection"
+    signal_source: str = "distance_proximity"
     normal_axis: int = 2
     projection_sigma: float = 0.0025
     clip_max: float = 25.0
     temporal_ema_alpha: float = 0.25
     spatial_smoothing: bool = True
     contact_time_constant: float = 0.01
+    proximity_sigma: float = 0.00030
+    proximity_reach: float = 0.00125
+    proximity_threshold: float = 0.05
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, object] | None):
         value = dict(value or {})
         config = cls(
             signal_source=str(
-                value.get("signal_source", "continuous_contact_projection")
+                value.get("signal_source", "distance_proximity")
             ),
             normal_axis=int(value.get("normal_axis", 2)),
             projection_sigma=float(value.get("projection_sigma", 0.0025)),
@@ -151,16 +156,20 @@ class TactileProcessingConfig:
             contact_time_constant=float(
                 value.get("contact_time_constant", 0.01)
             ),
+            proximity_sigma=float(value.get("proximity_sigma", 0.00030)),
+            proximity_reach=float(value.get("proximity_reach", 0.00125)),
+            proximity_threshold=float(value.get("proximity_threshold", 0.05)),
         )
         if config.normal_axis not in (0, 1, 2):
             raise ValueError("tactile normal_axis must be 0, 1 or 2")
         if config.signal_source not in {
+            "distance_proximity",
             "continuous_contact_projection",
             "legacy_force_sensor",
         }:
             raise ValueError(
-                "tactile signal_source must be continuous_contact_projection "
-                "or legacy_force_sensor"
+                "tactile signal_source must be distance_proximity, "
+                "continuous_contact_projection or legacy_force_sensor"
             )
         if config.projection_sigma <= 0:
             raise ValueError("tactile projection_sigma must be positive")
@@ -170,11 +179,16 @@ class TactileProcessingConfig:
             raise ValueError("tactile temporal_ema_alpha must be in (0, 1]")
         if config.contact_time_constant <= 0:
             raise ValueError("tactile contact_time_constant must be positive")
+        if config.proximity_sigma <= 0 or config.proximity_reach <= 0:
+            raise ValueError("tactile proximity sigma/reach must be positive")
+        if not 0 <= config.proximity_threshold < 1:
+            raise ValueError("tactile proximity_threshold must be in [0, 1)")
         return config
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "format_version": 2,
+            "format_version": 5,
+            "algorithm": "reference_b601_distance_proximity",
             "signal_source": self.signal_source,
             "grid_layout": "physical_columns_x_rows_8x16",
             "normal_axis": self.normal_axis,
@@ -183,7 +197,55 @@ class TactileProcessingConfig:
             "temporal_ema_alpha": self.temporal_ema_alpha,
             "spatial_smoothing": self.spatial_smoothing,
             "contact_time_constant": self.contact_time_constant,
+            "proximity_sigma": self.proximity_sigma,
+            "proximity_reach": self.proximity_reach,
+            "proximity_threshold": self.proximity_threshold,
         }
+
+
+def tactile_proximity_geom_ids(model, side: str) -> np.ndarray:
+    """Reference B601 taxel ordering: numeric XML body-name suffix."""
+    ids: list[tuple[int, int]] = []
+    prefix = f"touch_cell_{side}_"
+    for geom_id in range(model.ngeom):
+        body_id = int(model.geom_bodyid[geom_id])
+        body_name = mujoco.mj_id2name(
+            model, mujoco.mjtObj.mjOBJ_BODY, body_id
+        ) or ""
+        if body_name.startswith(prefix):
+            ids.append((int(body_name[-3:]), geom_id))
+    ids.sort()
+    if len(ids) != TACTILE_SHAPE[0] * TACTILE_SHAPE[1]:
+        raise RuntimeError(
+            f"{side} tactile proximity requires 128 taxel geoms, got {len(ids)}"
+        )
+    return np.asarray([geom_id for _, geom_id in ids], dtype=np.int32)
+
+
+def read_tactile_proximity(
+    model,
+    data,
+    object_geom_id: int,
+    taxel_geom_ids: np.ndarray,
+    *,
+    sigma: float,
+    reach: float,
+    threshold: float,
+) -> np.ndarray:
+    """Exact B601 reference distance-based 8x16 tactile map."""
+    distances = np.empty(len(taxel_geom_ids), dtype=np.float32)
+    fromto = np.empty(6, dtype=np.float64)
+    for index, geom_id in enumerate(taxel_geom_ids):
+        distances[index] = mujoco.mj_geomDistance(
+            model, data, int(geom_id), int(object_geom_id), 0.006, fromto
+        )
+    values = np.exp(
+        -np.square(np.maximum(distances, 0.0) / sigma)
+    ).astype(np.float32)
+    values[distances > reach] = 0.0
+    values[values < threshold] = 0.0
+    # Official XML numbering advances over 8 physical columns, then 16 rows.
+    return values.reshape(16, 8).T
 
 
 def write_or_validate_processing_spec(

@@ -69,8 +69,12 @@ class SimACTDatasetWriter:
                 robot_type="rebot_sim",
                 fps=fps,
                 features=build_lerobot_features(include_auxiliary=True),
-                image_writer_threads=10,
-                image_writer_processes=5,
+                # Keep image encoding in this process. Forked workers and an
+                # active GLFW/OpenGL context are an unsafe combination and can
+                # terminate collection with SIGSEGV on Linux GPU drivers.
+                # Four threads per camera follows LeRobot's recommendation.
+                image_writer_threads=8,
+                image_writer_processes=0,
             )
         )
         expected = set(build_lerobot_features(include_auxiliary=True))
@@ -97,5 +101,11 @@ class SimACTDatasetWriter:
         self.frames_in_buffer = 0
 
     def discard_episode(self) -> None:
+        # LeRobot writes camera frames asynchronously.  Deleting the episode
+        # directory while workers still hold pending writes races with
+        # shutil.rmtree and can leave the directory non-empty.
+        image_writer = getattr(self.dataset, "image_writer", None)
+        if image_writer is not None:
+            image_writer.wait_until_done()
         self.dataset.clear_episode_buffer()
         self.frames_in_buffer = 0

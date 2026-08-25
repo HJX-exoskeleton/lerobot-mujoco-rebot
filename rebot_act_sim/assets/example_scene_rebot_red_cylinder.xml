@@ -1,0 +1,37 @@
+<mujoco model="reBot red cylinder pick-and-place">
+  <compiler meshdir="../.." texturedir="../.."/>
+  <size memory="500M"/>
+  <include file="../../asset/tabletop/object/object_table.xml"/>
+  <include file="rebotarm_b601_colored_act.xml"/>
+  <include file="../../asset/objaverse/plate_11/model_new.xml"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+  </visual>
+  <asset>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+             rgb1="0.9 0.9 0.9" rgb2="0.8 0.8 0.8" markrgb="0.8 0.8 0.8"
+             width="1000" height="1000"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+              texrepeat="1 1" reflectance="0.1"/>
+  </asset>
+
+  <!-- Shape-only comparison object: 4 cm diameter and 4 cm high. Legacy
+       object/geom names keep it compatible with the existing task code. -->
+  <worldbody>
+    <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5"
+           directional="true"/>
+    <geom name="floor" group="1" size="0 0 0.05" type="plane"
+          material="groundplane"/>
+    <body name="body_obj_mug_5" pos="0.32 0.08 0.82">
+      <freejoint/>
+      <inertial pos="0 0 0" mass="0.05"
+                diaginertia="1.1667e-5 1.1667e-5 1.0e-5"/>
+      <geom name="geom_obj_red_cube" type="cylinder" size="0.02 0.02"
+            mass="0.05" rgba="1 0 0 1" condim="4"
+            friction="1.2 0.01 0.001" solimp="0.95 0.99 0.001"
+            solref="0.01 1"/>
+    </body>
+  </worldbody>
+</mujoco>

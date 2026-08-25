@@ -1,9 +1,26 @@
 <mujoco model="reBot red cube pick-and-place">
+  <!-- Included mesh paths normalize to repository-relative paths.  Resolve
+       all of them from the repository root without affecting textures. -->
+  <compiler meshdir="../.." texturedir="../.."/>
   <size memory="500M"/>
-  <include file="../../asset/tabletop/object/floor_isaac_style.xml"/>
   <include file="../../asset/tabletop/object/object_table.xml"/>
-  <include file="../../asset_rebot/reBot-DevArm_gripper_tactile.xml"/>
+  <!-- Official colored B601 arm; tabletop, cube and plate remain unchanged. -->
+  <include file="rebotarm_b601_colored_act.xml"/>
   <include file="../../asset/objaverse/plate_11/model_new.xml"/>
+
+  <!-- Preserve the original floor geometry/light, replacing only its builtin
+       gradient sky with the official B601 desert skybox. -->
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+  </visual>
+  <asset>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+             rgb1="0.9 0.9 0.9" rgb2="0.8 0.8 0.8" markrgb="0.8 0.8 0.8"
+             width="1000" height="1000"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+              texrepeat="1 1" reflectance="0.1"/>
+  </asset>
 
   <!--
     MuJoCo box size is half extent, so this is a 4 cm cube.
@@ -12,6 +29,10 @@
     generic task object everywhere outside that compatibility boundary.
   -->
   <worldbody>
+    <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5"
+           directional="true"/>
+    <geom name="floor" group="1" size="0 0 0.05" type="plane"
+          material="groundplane"/>
     <body name="body_obj_mug_5" pos="0.32 0.08 0.82">
       <freejoint/>
       <inertial pos="0 0 0" mass="0.05" diaginertia="1.333e-5 1.333e-5 1.333e-5"/>
@@ -29,20 +50,4 @@
     </body>
   </worldbody>
 
-  <actuator>
-    <position name="actuator_joint1" ctrllimited="true" ctrlrange="-1.87 1.87"
-              joint="joint1" kp="900" forcerange="-150 150" forcelimited="true"/>
-    <position name="actuator_joint2" ctrllimited="true" ctrlrange="-3.14 0"
-              joint="joint2" kp="900" forcerange="-150 150" forcelimited="true"/>
-    <position name="actuator_joint3" ctrllimited="true" ctrlrange="-3.14 0"
-              joint="joint3" kp="900" forcerange="-150 150" forcelimited="true"/>
-    <position name="actuator_joint4" ctrllimited="true" ctrlrange="-1.87 1.57"
-              joint="joint4" kp="600" forcerange="-100 100" forcelimited="true"/>
-    <position name="actuator_joint5" ctrllimited="true" ctrlrange="-1.57 1.57"
-              joint="joint5" kp="600" forcerange="-100 100" forcelimited="true"/>
-    <position name="actuator_joint6" ctrllimited="true" ctrlrange="-3.14 3.14"
-              joint="joint6" kp="600" forcerange="-100 100" forcelimited="true"/>
-    <position name="gripper" joint="left_finger" class="finger"
-              forcerange="-100 100" forcelimited="true"/>
-  </actuator>
 </mujoco>

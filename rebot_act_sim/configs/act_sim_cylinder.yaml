@@ -1,11 +1,11 @@
 dataset:
-  repo_id: rebot_sim/rebot_act_red_cube
-  root: ./data_act_sim/rebot_act_red_cube
-  task: put_red_cube_on_plate
+  repo_id: rebot_sim/rebot_act_red_cylinder
+  root: ./data_act_sim/rebot_act_red_cylinder
+  task: put_red_cylinder_on_plate
   fps: 50
 
 environment:
-  xml: ./rebot_act_sim/assets/example_scene_rebot_red_cube.xml
+  xml: ./rebot_act_sim/assets/example_scene_rebot_red_cylinder.xml
   seed: 0
   success_hold_seconds: 0.5
   camera_render_hz: 25
@@ -46,7 +46,7 @@ multimodal:
   sensor_embed_dim: 64
 
 training:
-  output_dir: ./rebot_act_sim/ckpt/act_sim_red_cube
+  output_dir: ./rebot_act_sim/ckpt/act_sim_red_cylinder
   steps: 8000
   batch_size: 4
   num_workers: 8

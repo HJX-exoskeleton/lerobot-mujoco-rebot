@@ -8,7 +8,6 @@ import cv2
 import numpy as np
 from threading import Lock
 
-MUJOCO_VERSION = tuple(map(int,mujoco.__version__.split('.')))
 
 from .transforms import (
     t2p,
@@ -123,7 +122,6 @@ class MinimalCallbacks:
                     action,
                     dx / height,
                     dy / height,
-                    self.scn,
                     self.cam)
 
         self._last_mouse_x = int(self._scale * xpos)
@@ -182,7 +180,12 @@ class MinimalCallbacks:
     def _scroll_callback(self, window, x_offset, y_offset):
         with self._gui_lock:
             mujoco.mjv_moveCamera(
-                self.model, mujoco.mjtMouse.mjMOUSE_ZOOM, 0, -0.05 * y_offset, self.scn, self.cam)
+                self.model,
+                mujoco.mjtMouse.mjMOUSE_ZOOM,
+                0,
+                -0.05 * y_offset,
+                self.cam,
+            )
 
 class MuJoCoMinimalViewer(MinimalCallbacks):
     def __init__(
@@ -303,36 +306,31 @@ class MuJoCoMinimalViewer(MinimalCallbacks):
                 self.scn.maxgeom)
 
         g = self.scn.geoms[self.scn.ngeom]
-        # default values.
+        # Initialize the complete mjvGeom using MuJoCo's version-aware API.
+        # The former hand-written initialization left texture/material fields
+        # undefined on 3.11 (it mistook minor version 11 for version 1). With a
+        # skybox active, mjr_render could dereference that invalid texture id
+        # and terminate the process with SIGSEGV.
+        mujoco.mjv_initGeom(
+            g,
+            mujoco.mjtGeom.mjGEOM_BOX,
+            np.full(3, 0.1, dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+            np.eye(3, dtype=np.float64).reshape(-1),
+            np.ones(4, dtype=np.float32),
+        )
         g.dataid = -1
         g.objtype = mujoco.mjtObj.mjOBJ_UNKNOWN
         g.objid = -1
         g.category = mujoco.mjtCatBit.mjCAT_DECOR
-        # g.matid = -1 # newly added (by Jihwan, 2025-02-27)
-        """
-            mujoco version 3.2 is NOT backward-compatible
-        """
-        if MUJOCO_VERSION[1] == 1:
-            """
-                Following lines make error for mujoco version 3.2
-            """
-            g.texid        = -1
-            g.texuniform   = 0
-            g.texrepeat[0] = 1
-            g.texrepeat[1] = 1
-        
-        g.emission    = 0
-        g.specular    = 0.5
-        g.shininess   = 0.5
-        g.reflectance = 0
-        g.type        = mujoco.mjtGeom.mjGEOM_BOX
-        g.size[:]     = np.ones(3) * 0.1
-        g.mat[:]      = np.eye(3)
-        g.rgba[:]     = np.ones(4)
 
         for key, value in marker.items():
             # setattr(g, key, value)
-            if isinstance(value, (int, float, mujoco._enums.mjtGeom)):
+            # pybind11 enums such as mujoco.mjtGeom are SupportsInt but are
+            # not reported as NumPy scalars on MuJoCo 3.11.
+            if key == "type":
+                g.type = int(value)
+            elif isinstance(value, (int, float, np.integer, np.floating)):
                 setattr(g, key, value)
             elif isinstance(value, (tuple, list, np.ndarray)):
                 attr = getattr(g, key)
@@ -1201,6 +1199,10 @@ class MuJoCoParserClass(object):
             use_rgb_overlay   = use_rgb_overlay,
             loc_rgb_overlay   = loc_rgb_overlay,
         )
+        # MuJoCoMinimalViewer creates a default context. Free it before
+        # replacing it with the requested font-scale context, otherwise large
+        # textures such as the desert skybox remain duplicated on the GPU.
+        self.viewer.ctx.free()
         self.viewer.ctx = mujoco.MjrContext(self.model,fontscale)
         
         # Set viewer
@@ -4044,7 +4046,6 @@ class MuJoCoParserClass(object):
             return True 
         else:
             return False
-    
     def get_xyz_right_double_click(self,verbose=False,fovy=45):
         """
         Retrieve the 3D world coordinates corresponding to a right double-click event.
@@ -4382,4 +4383,3 @@ class MuJoCoParserClass(object):
             return False
         else:
             return False
-    

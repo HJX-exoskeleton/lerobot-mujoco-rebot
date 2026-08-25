@@ -14,8 +14,23 @@
 - 仿真代码不依赖任何真机驱动。
 
 当前任务使用专用场景
-`rebot_act_sim/assets/example_scene_rebot_red_cube.xml`。原杯子网格已经替换为
-纯红色方块：
+`rebot_act_sim/assets/example_scene_rebot_red_cube.xml`。机械臂已由旧版
+`asset_rebot/reBot-DevArm_gripper_tactile.xml` 升级为
+`asset_rebotarm_b601_colored` 中的官方彩色 B601 模型；任务桌面、纯红色方块、
+目标盘、固定场景相机、物体随机范围和成功判定保持不变。
+
+场景通过任务适配文件 `rebot_act_sim/assets/rebotarm_b601_colored_act.xml` 引用
+官方目录中的彩色 STL 与 `8×16` 触觉资源，不复制网格。该适配层只做以下兼容：
+
+- 将 B601 基座保持在原任务坐标 `[-0.05, 0, 0.8]`；
+- 保留官方 `joint1..joint6`、`finger_left/finger_right` 和位置伺服；
+- 使用官方 `end_link` 作为 IK/成功判定末端，使用 `cam_wrist` 作为腕部相机；
+- IMU 改读官方 `orientation_wrist/ang_vel_wrist/accel_wrist`；
+- 将官方机械臂默认碰撞参数限制在机械臂子树内，避免改变桌面和任务物体碰撞；
+- 不引入官方演示场景中的桌面和物体；背景使用官方 `desert.png` 天空盒，原任务
+  地面、桌面和灯光参数保持不变。
+
+原杯子网格保持替换为纯红色方块：
 
 ```xml
 <geom type="box" size="0.02 0.02 0.02" rgba="1 0 0 1"/>
@@ -24,11 +39,18 @@
 MuJoCo 的 box `size` 表示三个方向的半尺寸，因此方块实际边长为 `0.04 m`。
 方块质量为 `0.05 kg`，具有自由关节和独立碰撞几何，可以被正常抓取和放置。
 
+由于机械臂外观、夹爪几何、惯量和执行器增益已经升级，旧模型采集的数据集与
+checkpoint 不应继续用于正式评估；请使用当前 XML 重新采集、训练，并使用新的
+数据集目录或先显式备份旧数据。
+
 ## 2. 包结构
 
 ```text
 rebot_act_sim/
 ├── configs/act_sim.yaml          # 数据、环境、ACT和训练参数
+├── assets/
+│   ├── example_scene_rebot_red_cube.xml # 原任务场景
+│   └── rebotarm_b601_colored_act.xml    # 官方B601任务适配层
 ├── config.py                     # 配置与ACT特征构造
 ├── schema.py                     # 唯一数据契约
 ├── dataset_writer.py             # 安全创建、追加、保存和丢弃episode
@@ -66,15 +88,15 @@ sensor.gripper_feedback            float32 [2]
 sensor.imu                         float32 [10]
 sensor.tactile_left                float32 [8,16]  策略使用的处理后左触觉
 sensor.tactile_right               float32 [8,16]  策略使用的处理后右触觉
-sensor.tactile_left_raw            float32 [8,16]  当前物理步原始左法向力
-sensor.tactile_right_raw           float32 [8,16]  当前物理步原始右法向力
+sensor.tactile_left_raw            float32 [8,16]  当前帧原始左接近强度
+sensor.tactile_right_raw           float32 [8,16]  当前帧原始右接近强度
 sensor.sim_time                    float64 [1]
 episode.object_initial_position    float32 [6]
 ```
 
 `sensor.imu` 的顺序是末端 `quaternion(wxyz) + gyro(xyz) + accel(xyz)`。
 
-MuJoCo 模型提供左右两个原生 `8×16` 夹爪力阵列，分别保存为
+MuJoCo 模型提供左右两个原生 `8×16` 夹爪触觉阵列，分别保存为
 `sensor.tactile_left` 和 `sensor.tactile_right`。不进行尺寸插值或真机维度适配。
 多模态编码器在网络输入端将左右阵列堆叠为 `[2,8,16]` 双通道张量。
 
@@ -83,10 +105,10 @@ MuJoCo 模型提供左右两个原生 `8×16` 夹爪力阵列，分别保存为
 不会直接 reshape 后打乱空间相邻关系。
 
 ```text
-每侧一个连续碰撞面上的MuJoCo接触区域与法向力
-  → 接触区域平滑投影到原生8×16网格
-  → 每物理步限幅
-  → 8个400Hz物理步求平均
+每个taxel与红方块表面的精确mj_geomDistance
+  → 高斯距离响应 exp(-(distance/sigma)^2)
+  → 超过reach或低于threshold的响应置零
+  → 按官方编号转换为原生8×16网格
   → 3x3 [1,2,1]高斯空间平滑
   → 50Hz时间EMA
   → sensor.tactile_left/right
@@ -94,12 +116,18 @@ MuJoCo 模型提供左右两个原生 `8×16` 夹爪力阵列，分别保存为
 
 `sensor.tactile_left_raw/right_raw` 仅用于诊断，不进入 ACT。数据集根目录和触觉
 checkpoint 都保存 `rebot_sim_tactile_processing.json`；训练、追加采集和部署
-会检查信号来源、网格布局、投影核、限幅、空间平滑、EMA 和接触时间常数与
+会检查信号来源、网格布局、距离核、限幅、空间平滑、EMA 和接触时间常数与
 YAML 完全一致，不一致时直接停止。仅影响界面的
 `visualization_color_max` 不参与该兼容性检查。
 
-连续碰撞面用于避免 128 个共面小碰撞体之间出现不唯一的接触力分配。各 taxel
-小方块仍保留用于显示和定位，但在本环境实例中不参与碰撞。
+采集和重播界面均显示处理后的 `sensor.tactile_left/right`，因此两者使用相同的
+空间平滑与时间 EMA，不会把仅供诊断的逐 taxel 原始距离响应直接显示成跳动噪点。
+左右热图分别显示各自 pad 的测量结果，不再把两侧镜像平均；圆柱接触因此显示为
+各自实际位置上的纵向素线，不会被合成为“两边亮、中间暗”的双线假象。
+
+该逻辑参考官方脚本 `rebotarm_colored_with_gripper_vis_rgb_8_16.py`：256 个
+taxel 小方块仅用于显示和距离定位，不加入物理碰撞约束；实际夹持载荷仍由左右
+手指碰撞几何承担。这样既获得连续触觉图，也避免数百个接触约束造成卡顿。
 
 ## 4. 时序定义
 
@@ -108,8 +136,8 @@ YAML 完全一致，不一致时直接停止。仅影响界面的
 一个 50 Hz 数据周期严格按以下顺序执行：
 
 ```text
-推进8个MuJoCo物理步并累积触觉
-  → 读取当前图像、关节反馈、IMU和处理后触觉
+推进8个MuJoCo物理步
+  → 读取当前图像、关节反馈、IMU和50Hz距离触觉
   → 根据当前观测读取键盘并求解IK目标
   → 保存 (当前观测, 本周期下发目标)
   → 目标在后续物理步中执行
@@ -122,11 +150,49 @@ YAML 完全一致，不一致时直接停止。仅影响界面的
 
 所有命令在仓库根目录执行。
 
+当前 viewer 已适配 MuJoCo 3.11 的五参数 `mjv_moveCamera` 接口，鼠标左键旋转、
+右键平移和滚轮缩放均可直接用于采集窗口。依赖允许使用 MuJoCo `3.1.6` 至
+`4.0` 之前的 3.x 版本。
+
 ### 5.1 采集
 
 ```bash
 python -m rebot_act_sim.workflow.collect --episodes 20
 ```
+
+无需键盘操作的自动采集使用：
+
+```bash
+python -m rebot_act_sim.workflow.collect --auto_collect --episodes 20
+
+# 调整整段轨迹速度（默认 1.0 倍；建议保持在 0.8～1.2）
+python -m rebot_act_sim.workflow.collect --auto_collect --episodes 20 --auto-speed 0.8
+```
+
+若要排除方块棱角对夹持观感的影响，可使用独立的 4 cm 红色圆柱场景进行对照：
+
+```bash
+python -m rebot_act_sim.workflow.collect \
+  --config rebot_act_sim/configs/act_sim_cylinder.yaml \
+  --auto_collect --episodes 20
+```
+
+圆柱测试使用独立数据目录 `data_act_sim/rebot_act_red_cylinder`，不会与方块数据集
+混合。重播时使用同一份配置：
+
+```bash
+python -m rebot_act_sim.workflow.replay \
+  --config rebot_act_sim/configs/act_sim_cylinder.yaml --episode 0
+```
+
+`--auto_collect` 会在每个 episode 开始时读取本次随机化后的方块和托盘位置，
+依次执行张开夹爪、移动到方块上方、下降夹持、抬升、移动到托盘中心、闭环校正、
+稳定释放和退回。笛卡尔轨迹采用端点速度与加速度均为零的五次平滑插值，并在
+托盘上方及释放前后增加稳定阶段；IK 关节目标另有限速与加速度约束，以减少
+机械臂抖动和方块释放后的横向漂移。
+保存的 `action` 是每个 50 Hz 周期实际下发的六关节 IK 目标与夹爪目标。只有任务
+成功并持续满足成功判定后才保存 episode；超过 `--max-frames` 的失败尝试会丢弃、
+重新随机化并自动重试。自动模式仍会显示 MuJoCo 和传感器画面，关闭窗口可安全退出。
 
 平移键位与旧环境一致：`W/A/S/D` 控制水平移动，`R/F` 控制升降。旋转键位在
 本包中重新定义为：
@@ -139,7 +205,7 @@ Space    切换夹爪
 Z        丢弃当前episode并重置
 ```
 
-这些旋转均绕 `tcp_link` 局部坐标轴执行。第一次创建的数据默认位于
+这些旋转均绕官方 `end_link` 局部坐标轴执行。第一次创建的数据默认位于
 `data_act_sim/rebot_act_red_cube`。
 
 平移步长为每个 50 Hz 周期 `0.003 m`，旋转步长为 `0.02 rad`。采集端对连续
@@ -147,32 +213,55 @@ Z        丢弃当前episode并重置
 避免键盘位置阶跃激发夹爪和接触求解器；这不会改变数据采集的 50 Hz 频率。
 
 采集窗口左上角会实时显示当前 MuJoCo 帧的 IMU 曲线和左右 `8×16` 触觉热图，
-布局与数据回放面板一致。开始新 episode 时曲线历史和触觉滤波状态会自动清零。
+布局与数据回放面板一致。面板由后台线程绘制；开始新 episode 时曲线历史和触觉
+滤波状态会自动清零。末端绿色方向线已改为浅绿色、半透明细线，减少画面遮挡。
 
-可通过 `--render-every N` 控制 MuJoCo viewer 的渲染频率（默认 `1`，即每个控制周期
-渲染一次）。设置为 `2` 或更大值时可降低渲染开销，提升控制循环的实时性：
+采集默认以 25 Hz 更新 viewer（`--render-every 2`），双相机默认按
+`environment.camera_render_hz: 25` 实际渲染；数据集、关节、动作、IMU、触觉和
+时间轴仍保持 50 Hz，中间控制帧复用最近的双相机图像。无用的 `sideview` 不再
+渲染。可按机器性能调整：
+
+```bash
+# 更低延迟：相机有效10Hz、viewer有效25Hz
+python -m rebot_act_sim.workflow.collect --episodes 20 --camera-render-hz 10
+
+# 恢复双相机与viewer均为50Hz（GPU足够快时使用）
+python -m rebot_act_sim.workflow.collect --episodes 20 \
+  --camera-render-hz 50 --render-every 1
+```
 
 触觉处理参数位于同一环境配置中：
 
 ```yaml
 tactile_processing:
-  signal_source: continuous_contact_projection
+  signal_source: distance_proximity
   normal_axis: 2
   projection_sigma: 0.0025
-  clip_max: 25.0
+  clip_max: 1.0
   temporal_ema_alpha: 0.25
   spatial_smoothing: true
   contact_time_constant: 0.01
-  visualization_color_max: 15.0
+  proximity_sigma: 0.00030
+  proximity_reach: 0.00125
+  proximity_threshold: 0.05
+  visualization_color_max: 1.0
 ```
 
-其中 `projection_sigma` 单位为米，控制接触区域边界的平滑宽度；
-`visualization_color_max` 只控制显示；其余参数定义保存到数据集和触觉
-checkpoint 的策略触觉语义。`legacy_force_sensor` 仅用于旧模型诊断，不建议
-用于新数据采集。
+`proximity_sigma` 和 `proximity_reach` 单位为米，分别控制距离响应衰减和最大
+感知范围；`proximity_threshold` 抑制微弱远场响应。`visualization_color_max`
+只控制显示；其余参数定义保存到数据集和触觉 checkpoint 的策略触觉语义。
+`continuous_contact_projection` 与 `legacy_force_sensor` 保留用于旧数据诊断，
+新 B601 数据默认使用 `distance_proximity`。
 
-热图使用平方根对比度增强低压力区域，因此显示颜色不再与策略保存数值一一
-线性对应；数据本身仍保存未经显示变换的法向力。
+触觉处理规格已升级为 format version 3，不能向使用旧法向力语义的数据集直接
+追加。重新采集时请改用新的数据集目录，或确认旧数据无需保留后执行：
+
+```bash
+python -m rebot_act_sim.workflow.collect --episodes 20 --overwrite
+```
+
+热图使用平方根对比度增强低强度区域，因此显示颜色不再与策略保存数值一一
+线性对应；数据本身仍保存未经显示变换的接近强度。
 
 物体初始化由 `environment.object_randomization` 统一控制：
 
@@ -315,7 +404,7 @@ python -m rebot_act_sim.workflow.deploy --seed 0
 ```
 
 部署会根据 checkpoint 中的 `rebot_sim_multimodal.json` 自动判断是否需要
-IMU/触觉，并据此决定是否启用每物理步的触觉接触投影。默认每个控制周期重新
+IMU/触觉，并据此决定是否启用 50 Hz 距离触觉计算。默认每个控制周期重新
 预测动作块，并以系数 0.9 做时间集合。
 
 **性能优化**（为保障 50 Hz 实时性）：
@@ -355,7 +444,7 @@ python -m rebot_act_sim.workflow.deploy --checkpoint rebot_act_sim/ckpt/act_sim_
 | 动作 | 六关节绝对目标 + 0/1夹爪 | 六关节绝对目标 + 达妙夹爪目标 |
 | IMU | MuJoCo末端framequat/gyro/accel | 串口IMU |
 | 触觉 | 左右两个独立8×16力阵列 | FlexiTac 12×30 |
-| 相机 | MuJoCo agent/egocentric | Astra/RealSense |
+| 相机 | MuJoCo agentview/cam_wrist | Astra/RealSense |
 
 夹爪最后一维和触觉阵列维度在仿真与真机间不同，因此 checkpoint 不能未经适配
 直接跨域执行。左右触觉的字段语义保持清晰，后续如需 sim-to-real，应增加显式的

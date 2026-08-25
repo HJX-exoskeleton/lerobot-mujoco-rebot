@@ -38,6 +38,7 @@ class EpisodeSampler(torch.utils.data.Sampler):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--xml", help="Override the environment XML used for replay.")
     parser.add_argument("--episode", type=int, default=0)
     parser.add_argument(
         "--no-sensors",
@@ -68,7 +69,7 @@ def main() -> None:
         dataset, batch_size=1, sampler=EpisodeSampler(dataset, args.episode), num_workers=0
     )
     env = SimACTEnvironment(
-        resolve_project_path(raw["environment"]["xml"]),
+        resolve_project_path(args.xml or raw["environment"]["xml"]),
         seed=None,
         **object_randomization_kwargs(raw),
         **tactile_processing_kwargs(raw),

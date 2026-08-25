@@ -17,7 +17,12 @@ class SimpleEnv:
                 state_type='joint_angle',
                 seed = None,
                 success_hold_seconds=1.0,
-                control_hz=20):
+                control_hz=20,
+                gripper_joint_name='left_finger',
+                tcp_body_name='tcp_link',
+                egocentric_camera_name='egocentric',
+                tcp_marker_radius=0.02,
+                tcp_marker_site_name=None):
         """
         args:
             xml_path: str, path to the xml file
@@ -36,7 +41,11 @@ class SimpleEnv:
                     'joint4',
                     'joint5',
                     'joint6',]
-        self.gripper_joint_name = 'left_finger'
+        self.gripper_joint_name = gripper_joint_name
+        self.tcp_body_name = tcp_body_name
+        self.egocentric_camera_name = egocentric_camera_name
+        self.tcp_marker_radius = float(tcp_marker_radius)
+        self.tcp_marker_site_name = tcp_marker_site_name
         self.gripper_open = 0.05
         self.gripper_closed = 0.001
         self.success_hold_steps = max(1, int(np.ceil(success_hold_seconds * control_hz)))
@@ -69,7 +78,7 @@ class SimpleEnv:
         q_zero,ik_err_stack,ik_info = solve_ik(
             env = self.env,
             joint_names_for_ik = self.joint_names,
-            body_name_trgt     = 'tcp_link',
+            body_name_trgt     = self.tcp_body_name,
             q_init       = q_init, # ik from zero pose
             p_trgt       = np.array([0.3, 0.0, 0.95]),
             # reBot's tool axis is local +X. Rotate it onto world -Z so the
@@ -97,7 +106,7 @@ class SimpleEnv:
         # Set the initial pose of the robot
         self.last_q = copy.deepcopy(q_zero)
         self.q = np.concatenate([q_zero, [self.gripper_open]])
-        self.p0, self.R0 = self.env.get_pR_body(body_name='tcp_link')
+        self.p0, self.R0 = self.env.get_pR_body(body_name=self.tcp_body_name)
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         for _ in range(100):
@@ -124,7 +133,7 @@ class SimpleEnv:
             q ,ik_err_stack,ik_info = solve_ik(
                 env                = self.env,
                 joint_names_for_ik = self.joint_names,
-                body_name_trgt     = 'tcp_link',
+                body_name_trgt     = self.tcp_body_name,
                 q_init             = q,
                 p_trgt             = self.p0,
                 R_trgt             = self.R0,
@@ -160,7 +169,7 @@ class SimpleEnv:
     def step_env(self):
         self.env.step(self.q)
 
-    def grab_image(self):
+    def grab_image(self, grab_sideview=True):
         '''
         grab images from the environment
         returns:
@@ -170,11 +179,13 @@ class SimpleEnv:
         self.rgb_agent = self.env.get_fixed_cam_rgb(
             cam_name='agentview')
         self.rgb_ego = self.env.get_fixed_cam_rgb(
-            cam_name='egocentric')
+            cam_name=self.egocentric_camera_name)
         # self.rgb_top = self.env.get_fixed_cam_rgbd_pcd(
         #     cam_name='topview')
-        self.rgb_side = self.env.get_fixed_cam_rgb(
-            cam_name='sideview')
+        self.rgb_side = (
+            self.env.get_fixed_cam_rgb(cam_name='sideview')
+            if grab_sideview else None
+        )
         return self.rgb_agent, self.rgb_ego
         
 
@@ -183,18 +194,36 @@ class SimpleEnv:
         Render the environment
         '''
         self.env.plot_time()
-        p_current, R_current = self.env.get_pR_body(body_name='tcp_link')
+        if self.tcp_marker_site_name is None:
+            p_current, R_current = self.env.get_pR_body(
+                body_name=self.tcp_body_name
+            )
+        else:
+            p_current, R_current = self.env.get_pR_site(
+                site_name=self.tcp_marker_site_name
+            )
         # plot_capsule is aligned with its local Z axis, while reBot's tool
-        # approach direction is tcp_link local X. Map capsule Z onto tool X.
+        # The configured tool body's approach direction is local X. Map the
+        # capsule Z axis onto tool X.
         R_tool_line = R_current @ rpy2r(np.deg2rad([0.0, 90.0, 0.0]))
-        self.env.plot_sphere(p=p_current, r=0.02, rgba=[0.95,0.05,0.05,0.5])
-        self.env.plot_capsule(p=p_current, R=R_tool_line, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
+        self.env.plot_sphere(
+            p=p_current,
+            r=self.tcp_marker_radius,
+            rgba=[0.95, 0.05, 0.05, 0.5],
+        )
+        self.env.plot_capsule(
+            p=p_current,
+            R=R_tool_line,
+            r=0.007,
+            h=0.2,
+            rgba=[0.55, 1.0, 0.55, 0.20],
+        )
         rgb_egocentric_view = add_title_to_img(self.rgb_ego,text='Egocentric View',shape=(640,480))
         rgb_agent_view = add_title_to_img(self.rgb_agent,text='Agent View',shape=(640,480))
         
         self.env.viewer_rgb_overlay(rgb_agent_view,loc='top right')
         self.env.viewer_rgb_overlay(rgb_egocentric_view,loc='bottom right')
-        if teleop:
+        if teleop and self.rgb_side is not None:
             rgb_side_view = add_title_to_img(self.rgb_side,text='Side View',shape=(640,480))
             self.env.viewer_rgb_overlay(rgb_side_view, loc='top left')
             self.env.viewer_text_overlay(text1='Key Pressed',text2='%s'%(self.env.get_key_pressed_list()))
@@ -341,6 +370,6 @@ class SimpleEnv:
         '''
         get the end effector pose of the robot + gripper state
         '''
-        p, R = self.env.get_pR_body(body_name='tcp_link')
+        p, R = self.env.get_pR_body(body_name=self.tcp_body_name)
         rpy = r2rpy(R)
         return np.concatenate([p, rpy],dtype=np.float32)
