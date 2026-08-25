@@ -51,7 +51,7 @@ multimodal:
 
 training:
   output_dir: ./rebot_act_sim/ckpt/act_sim_red_cylinder
-  steps: 8000
+  steps: 6000
   batch_size: 4
   num_workers: 8
   use_policy_training_preset: true
