@@ -40,44 +40,6 @@ from rebot_act_sim.timing import WallClockRate
 from rebot_act_sim.visualization import AsyncSensorVisualizer, ReplaySensorVisualizer
 
 
-class ReleaseSettleGuard:
-    """Preserve the demonstration's pause between opening and retreating.
-
-    Only the six arm targets are held. The policy's gripper output is passed
-    through unchanged, so this is not gripper compensation or hysteresis.
-    """
-
-    def __init__(self, hold_steps: int):
-        self.hold_steps = max(int(hold_steps), 0)
-        self.remaining = 0
-        self.saw_closed = False
-        self.finished = False
-        self.arm_hold: np.ndarray | None = None
-
-    def update(
-        self, action: np.ndarray, measured_arm: np.ndarray
-    ) -> tuple[np.ndarray, bool]:
-        action = np.asarray(action, dtype=np.float32).copy()
-        if float(action[6]) >= 0.8:
-            self.saw_closed = True
-        if (
-            self.saw_closed
-            and not self.finished
-            and self.remaining == 0
-            and float(action[6]) <= 0.1
-            and self.hold_steps > 0
-        ):
-            self.arm_hold = np.asarray(measured_arm, dtype=np.float32).copy()
-            self.remaining = self.hold_steps
-        holding = self.remaining > 0
-        if holding:
-            action[:6] = self.arm_hold
-            self.remaining -= 1
-            if self.remaining == 0:
-                self.finished = True
-        return action, holding
-
-
 def _image(value: np.ndarray, device: torch.device) -> torch.Tensor:
     return (
         torch.from_numpy(np.array(value, copy=True, order="C"))
@@ -152,7 +114,12 @@ def main() -> None:
     parser.add_argument("--checkpoint")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--device")
-    parser.add_argument("--max-steps", type=int, default=800)
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=1000,
+        help="Maximum policy control steps (default: 1500, about 30 s at 50 Hz).",
+    )
     parser.add_argument(
         "--n-action-steps",
         type=int,
@@ -184,15 +151,7 @@ def main() -> None:
         action="store_true",
         help="Skip tactile contact projection in physics steps (saves ~5 ms per cycle).",
     )
-    parser.add_argument(
-        "--release-settle-seconds",
-        type=float,
-        default=0.5,
-        help="Hold only the arm after the first open command before retreat (default: 0.5 s).",
-    )
     args = parser.parse_args()
-    if args.release_settle_seconds < 0.0:
-        raise ValueError("--release-settle-seconds must be nonnegative")
     raw = load_config(args.config)
     if args.device:
         raw["policy"]["device"] = args.device
@@ -293,10 +252,6 @@ def main() -> None:
     last_action = np.zeros(7, dtype=np.float64)
     rate = WallClockRate(float(dataset_cfg["fps"]))
     render_every = max(1, int(args.render_every))
-    release_guard = ReleaseSettleGuard(
-        round(args.release_settle_seconds * float(dataset_cfg["fps"]))
-    )
-    release_announced = False
     try:
         with torch.inference_mode():
             while env.is_alive() and step < args.max_steps:
@@ -336,20 +291,7 @@ def main() -> None:
                 # Do not reshape or compensate the learned command. The final
                 # component is clipped by environment.command only to the
                 # normalized gripper range used during collection/replay.
-                action, release_holding = release_guard.update(
-                    raw_action, observation.joint_position
-                )
-                if release_holding and not release_announced:
-                    release_announced = True
-                    left_opening = env._gripper_position()
-                    right_opening = float(
-                        env.parser.get_qpos_joint("finger_right")[0]
-                    )
-                    print(
-                        "[RELEASE] holding arm for object detachment; "
-                        f"left={left_opening:.4f} right={right_opening:.4f} "
-                        f"policy_gripper={float(raw_action[6]):.4f}"
-                    )
+                action = raw_action
                 action_min = np.minimum(action_min, action)
                 action_max = np.maximum(action_max, action)
                 last_action = action.copy()

@@ -440,9 +440,9 @@ python -m rebot_act_sim.workflow.deploy --seed 0 --temporal-ensemble 0.01
 `chunk_size` 与 `n_action_steps`，不会使用当前 YAML 重建旧权重结构。
 仿真部署默认 `n_action_steps=1`，可用 `--n-action-steps` 显式修改。部署不会对
 六关节或夹爪预测添加补偿、滤波或二次整形，动作按采集/replay 相同语义直接交给
-`env.command()`。自动采集在张开夹爪后包含 0.5 秒 `settle released` 阶段；部署也
-会在首次松爪命令后仅保持六关节 0.5 秒，再允许撤离，夹爪输出始终使用策略原值。
-可用 `--release-settle-seconds` 调整或设为 0 禁用。指定
+`env.command()`。部署不会额外冻结松爪阶段的机械臂；否则 ACT 会持续看到静止
+观测并丢失已经预测出的上升撤离动作。从接近、抓取、搬运、放置、松爪到上升撤离，
+全部六关节和夹爪命令均来自 ACT 模型。指定
 `--temporal-ensemble [系数]` 时会按 LeRobot ACT 要求将 `n_action_steps` 设为 1。
 XML 负责场景和执行机构，不再隐式改变 checkpoint 的策略特征定义。
 
@@ -450,8 +450,7 @@ XML 负责场景和执行机构，不再隐式改变 checkpoint 的策略特征�
 
 ```bash
 python -m rebot_act_sim.workflow.deploy --seed 0 \
-  --n-action-steps 1 --temporal-ensemble 0.01 \
-  --release-settle-seconds 0.5
+  --n-action-steps 1 --temporal-ensemble 0.01
 ```
 
 **性能优化**（为保障 50 Hz 实时性）：
@@ -481,7 +480,7 @@ python -m rebot_act_sim.workflow.deploy --checkpoint rebot_act_sim/ckpt/act_sim_
 ```
 
 部署会在闭环中持续运行直到成功（方块放置到盘子上且夹爪打开、末端撤离并保持
-0.5 秒）或达到 `--max-steps`（默认 800 步）。结束时会输出末端/物体位移、动作
+0.5 秒）或达到 `--max-steps`（默认 1500 步，50 Hz 下约 30 秒）。结束时会输出末端/物体位移、动作
 范围和最后动作。如果 `min` 与 `max` 七维都相同，说明 checkpoint 已退化为恒定
 动作输出，应使用本节新版多模态训练约束重新训练，而不是继续调整 MuJoCo 控制器。
 
