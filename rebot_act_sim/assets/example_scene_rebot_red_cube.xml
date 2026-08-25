@@ -29,8 +29,11 @@
     generic task object everywhere outside that compatibility boundary.
   -->
   <worldbody>
-    <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5"
-           directional="true"/>
+<!--    <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5" directional="true"/>-->
+    <light castshadow="false" directional="true" diffuse=".3 .3 .3" specular="0.3 0.3 0.3" pos="-1 -1 1" dir="1 1 -1"/>
+    <light directional="true" diffuse=".3 .3 .3" specular="0.3 0.3 0.3" pos="1 -1 1" dir="-1 1 -1"/>
+    <light castshadow="false" directional="true" diffuse=".3 .3 .3" specular="0.3 0.3 0.3" pos="0 1 1" dir="0 -1 -1"/>
+
     <geom name="floor" group="1" size="0 0 0.05" type="plane"
           material="groundplane"/>
     <body name="body_obj_mug_5" pos="0.32 0.08 0.82">
