@@ -64,6 +64,16 @@ def _object_contact_names(env: SimACTEnvironment) -> list[str]:
     return sorted(names)
 
 
+def _deployment_seed(value: int | None) -> int | None:
+    """Default deployment to entropy-backed randomization.
+
+    A nonnegative CLI seed remains reproducible. Omitting ``--seed`` or using
+    a negative value deliberately requests a fresh object pose on every run;
+    the collection seed in the YAML must not silently fix deployment layouts.
+    """
+    return None if value is None or value < 0 else int(value)
+
+
 def _load_checkpoint_policy(
     checkpoint,
     metadata,
@@ -112,7 +122,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument("--checkpoint")
-    parser.add_argument("--seed", type=int)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help=(
+            "Reproducible object-layout seed. Omit it (or use -1) for a fresh "
+            "random object position on every deployment run."
+        ),
+    )
     parser.add_argument("--device")
     parser.add_argument(
         "--max-steps",
@@ -137,8 +154,11 @@ def main() -> None:
     parser.add_argument(
         "--sensors",
         action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Show camera/IMU/tactile overlays; disabled by default.",
+        default=True,
+        help=(
+            "Show the top-left IMU and tactile panel (default: enabled; use "
+            "--no-sensors for a clean MuJoCo view)."
+        ),
     )
     parser.add_argument(
         "--render-every",
@@ -206,7 +226,7 @@ def main() -> None:
         f"n_action_steps={policy.config.n_action_steps} | "
         f"temporal_ensemble={policy.config.temporal_ensemble_coeff}"
     )
-    seed = int(raw["environment"].get("seed", 0) if args.seed is None else args.seed)
+    seed = _deployment_seed(args.seed)
     env = SimACTEnvironment(
         resolve_project_path(raw["environment"]["xml"]),
         seed=None,
@@ -222,7 +242,14 @@ def main() -> None:
         **object_randomization_kwargs(raw),
         **tactile_processing_kwargs(raw),
     )
-    env.reset(None if seed < 0 else seed)
+    env.reset(seed)
+    deployed_object, deployed_plate = env.task.get_obj_pose()
+    print(
+        "[DEPLOY RESET] "
+        f"seed={'random' if seed is None else seed} | "
+        f"object={np.round(deployed_object, 4).tolist()} | "
+        f"plate={np.round(deployed_plate, 4).tolist()}"
+    )
 
     clean_view = not args.sensors
     _sync_viz = None

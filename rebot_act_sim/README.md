@@ -297,23 +297,23 @@ python -m rebot_act_sim.workflow.inspect_dataset
 python -m rebot_act_sim.workflow.replay --episode 0
 ```
 
-部署推理默认只显示 MuJoCo 仿真界面，不显示相机、IMU 或触觉面板。策略仍会正常
-读取相机、IMU 与左右 `8×16` 触觉输入；这里只关闭额外的显示开销。需要显示时：
+部署推理默认在 MuJoCo 界面左上角显示 IMU 与左右 `8×16` 触觉面板，面板数据与
+策略当前观测同步。需要只保留干净的仿真界面时：
 
 ```bash
-python -m rebot_act_sim.workflow.deploy --seed 0 --sensors
+python -m rebot_act_sim.workflow.deploy --no-sensors
 ```
 
 部署和回放均可通过 `--render-every N` 降低 MuJoCo viewer 的渲染频率：
 
 ```bash
-python -m rebot_act_sim.workflow.deploy --seed 0 --render-every 2
+python -m rebot_act_sim.workflow.deploy --render-every 2
 python -m rebot_act_sim.workflow.replay --episode 0 --render-every 2
 ```
 
 `--render-every` 设为大于 1 的值时，每 N 个控制周期才执行一次 `env.render()`，
 非渲染帧只推进物理和策略推理，跳过 MuJoCo 画面更新。默认 `1` 保持每帧渲染。
-部署传感器面板默认关闭，也可显式使用 `--no-sensors`。
+部署传感器面板默认开启，可使用 `--no-sensors` 关闭。
 面板显示的是送入策略的当前 `sensor.imu`、`sensor.tactile_left/right`，不是
 上一帧或数据集缓存。
 
@@ -422,8 +422,12 @@ rebot_act_sim/ckpt/act_sim_red_cube/
 ### 5.5 部署
 
 ```bash
-python -m rebot_act_sim.workflow.deploy --seed 0
+python -m rebot_act_sim.workflow.deploy
 ```
+
+部署默认在每次启动时从配置的 X/Y 范围内重新随机物体位置，并在启动日志的
+`[DEPLOY RESET]` 中输出实际坐标。需要复现实验时才显式传入非负 seed，例如
+`--seed 0`；同一个 seed 始终产生相同布局，`--seed -1` 与省略参数等价。
 
 部署会根据 checkpoint 中的 `rebot_sim_multimodal.json` 自动判断是否需要
 IMU/触觉，并据此决定是否启用 50 Hz 距离触觉计算。部署控制与
@@ -433,7 +437,7 @@ IMU/触觉，并据此决定是否启用 50 Hz 距离触觉计算。部署控制
 部署阶段相机时序分布变化并降低渲染负载。
 
 ```bash
-python -m rebot_act_sim.workflow.deploy --seed 0 --temporal-ensemble 0.01
+python -m rebot_act_sim.workflow.deploy --temporal-ensemble 0.01
 ```
 
 部署和真机项目一样从 checkpoint 自带的 `config.json` 恢复 ACT 网络、
@@ -449,7 +453,7 @@ XML 负责场景和执行机构，不再隐式改变 checkpoint 的策略特征�
 如需显式使用默认逐步闭环设置：
 
 ```bash
-python -m rebot_act_sim.workflow.deploy --seed 0 \
+python -m rebot_act_sim.workflow.deploy \
   --n-action-steps 1 --temporal-ensemble 0.01
 ```
 
@@ -464,16 +468,16 @@ python -m rebot_act_sim.workflow.deploy --seed 0 \
 
 ```bash
 # 默认：自动检测 checkpoint，跳过不必要的触觉处理
-python -m rebot_act_sim.workflow.deploy --seed 0
+python -m rebot_act_sim.workflow.deploy
 
 # 每两帧渲染一次 MuJoCo 画面
-python -m rebot_act_sim.workflow.deploy --seed 0 --render-every 2
+python -m rebot_act_sim.workflow.deploy --render-every 2
 
-# 显示相机、IMU和触觉面板（默认关闭）
-python -m rebot_act_sim.workflow.deploy --seed 0 --sensors
+# 默认显示左上角 IMU 和左右触觉面板；如需关闭
+python -m rebot_act_sim.workflow.deploy --no-sensors
 
 # 强制禁用触觉处理（即使 checkpoint 编码了触觉分支）
-python -m rebot_act_sim.workflow.deploy --seed 0 --no-tactile
+python -m rebot_act_sim.workflow.deploy --no-tactile
 
 # 指定 checkpoint
 python -m rebot_act_sim.workflow.deploy --checkpoint rebot_act_sim/ckpt/act_sim_red_cube/checkpoints/step_004000
