@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import glfw
 import numpy as np
@@ -13,6 +14,7 @@ from rebot_aerohand_right_act_sim.environment import (
     PIP_WIDTH,
     ROTATION_STEP,
     HandClosureMapper,
+    SimAeroHandACTEnvironment,
     camera_overlay_rects,
     grasp_marker_color,
     snap_hand_target,
@@ -137,3 +139,25 @@ def test_toggle_grasp_flips_all_fingers(hand_mapper):
     assert hand_mapper.closed.tolist() == [True] * len(HAND_FINGER_NAMES)
     hand_mapper.toggle_grasp()
     assert not np.any(hand_mapper.closed)
+
+
+def test_staged_close_rotates_thumb_before_finger_curl(hand_mapper):
+    env = SimAeroHandACTEnvironment.__new__(SimAeroHandACTEnvironment)
+    env.hand_mapper = hand_mapper
+    env.data = SimpleNamespace(time=1.0)
+    env.thumb_lead_seconds = 0.30
+    env._thumb_lead_until = None
+
+    hand_mapper.set_all_open()
+    env._start_staged_hand_close()
+    preshape = env._sequenced_hand_ctrl()
+    open_ctrl = hand_mapper.open_ctrl
+    closed_ctrl = hand_mapper.closed_ctrl
+
+    assert preshape[4] == pytest.approx(closed_ctrl[4])
+    assert np.allclose(preshape[:4], open_ctrl[:4])
+    assert np.allclose(preshape[5:7], open_ctrl[5:7])
+
+    env.data.time = 1.31
+    assert np.allclose(env._sequenced_hand_ctrl(), closed_ctrl)
+    hand_mapper.set_all_open()

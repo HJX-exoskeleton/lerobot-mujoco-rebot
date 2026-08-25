@@ -63,6 +63,7 @@ def teleop_kwargs(raw: dict) -> dict:
     return {} if value is None else {
         "teleop_motion_alpha": float(value.get("motion_alpha", 0.25)),
         "hand_command_alpha": float(value.get("hand_command_alpha", 0.25)),
+        "thumb_lead_seconds": float(value.get("thumb_lead_seconds", 0.12)),
     }
 
 

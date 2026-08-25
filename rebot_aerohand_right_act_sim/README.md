@@ -19,9 +19,9 @@
 当前任务使用专用场景
 `asset_rebot_aerohand_right/mujoco_xml/rebotarm_aerohand_act_cylinder.xml`。
 该场景 include 同目录下的 `rebotarm_aerohand_scene.xml`、
-`rebor_arm_6dof.xml` 与 `aerohand_right.xml`，并额外在 `tetheria_mount`
+`rebot_arm_right_hand.xml`，并额外在 `tetheria_mount`
 上挂载三个 IMU 传感器。场景必须与该目录中的其它 XML 同目录存放：MuJoCo
-仅当顶层 XML 与 `rebor_arm_6dof.xml` 嵌套 include 的
+仅当顶层 XML 与组合模型嵌套 include 的
 `aerohand_right_body.xml` 及全部网格/纹理位于同一目录时才能正确解析相对
 路径（详见 `rebot_aerohand_right_act_sim/assets/README.md`）。
 
@@ -154,6 +154,11 @@ hand_contact_processing:
 一致）做一阶滤波后写入 `data.ctrl`，避免阶跃目标激发肌腱与接触求解器；
 这不会改变数据采集的 50 Hz 频率，也不改变保存的动作语义。
 
+双相机默认按 `environment.camera_render_hz: 25` 渲染，50 Hz 控制序列中的中间
+帧复用最近一次 `top` 与 `cam_wrist` 图像。机械臂状态、动作、IMU、接触力和
+数据集时间轴仍保持 50 Hz；只有视觉内容的有效更新率为 25 Hz。该同步缓存方案
+不跨线程共享 `MjData` 或 OpenGL context，避免异步渲染导致图像与状态标签错位。
+
 ## 5. 使用
 
 所有命令在仓库根目录执行。
@@ -163,6 +168,44 @@ hand_contact_processing:
 ```bash
 python -m rebot_aerohand_right_act_sim.workflow.collect --episodes 20
 ```
+
+自动采集使用：
+
+```bash
+python -m rebot_aerohand_right_act_sim.workflow.collect \
+  --auto_collect \
+  --episodes 20
+```
+
+如果相机渲染仍然拖慢仿真，可进一步降低有效图像帧率：
+
+```bash
+python -m rebot_aerohand_right_act_sim.workflow.collect \
+  --auto_collect --camera-render-hz 10 --episodes 20
+```
+
+`--camera-render-hz` 只改变相机实际渲染频率，不改变数据集、状态和 action 的
+50 Hz 帧率；未重新渲染的控制帧会保存最近的有效图像。
+
+`--auto_collect` 会为每个随机化后的圆柱自动执行完整示教：张开手稳定、移动到
+预抓取位、下降、拇指虎口对掌、向前接近、五指包络、稳定抓取、抬升、移动到
+目标盘、下降、松抓、释放和撤离。动作经过现有 IK 与手部目标滤波器，并按普通
+采集完全相同的 observation/action 数据契约逐帧保存。
+
+自动轨迹默认使用 `2.5x` 速度，通常约 539 帧完成，低于默认的 800 帧上限。
+可使用 `--auto-speed` 调整，例如：
+
+```bash
+python -m rebot_aerohand_right_act_sim.workflow.collect \
+  --auto_collect --auto-speed 2.0 --episodes 20
+```
+
+自动模式仍显示 MuJoCo 窗口和相机 PIP，但忽略键盘遥操作；关闭窗口可提前退出。
+机械臂相邻 waypoint 使用连续线性笛卡尔插值，不会在每个阶段边界强制降速到
+零；抓取稳定、虎口预成形和释放等明确阶段仍按设计保持。采集界面的 PIP 直接
+复用写入数据集的 `top` 与 `cam_wrist` 图像，不再重复离屏渲染，降低界面卡顿。
+未满足放置、释放和撤离成功条件的 episode 仍会按原逻辑在达到
+`--max-frames` 后丢弃并随机重置。
 
 机械臂平移键位与 `rebot_act_sim` 一致：`W/A/S/D` 控制水平移动，`R/F` 控制
 升降。旋转均绕 `tetheria_mount` 局部坐标轴执行：
@@ -177,14 +220,23 @@ Q / E    左 / 右偏航
 
 ```text
 1 / 2 / 3 / 4 / 5   切换 拇指/食指/中指/无名指/小指 的开合
-Space               整体抓握/张开切换（五根手指同时翻转）
-O / C               全部张开 / 全部闭合
+Space               整体抓握/张开切换
+O / C               全部张开 / 分阶段闭合
 H                   机械臂回初始位形并张开手
 Z                   丢弃当前episode并重置
 ```
 
 手指开合是二元状态：张开时执行器目标为 `ctrlrange` 上界（拇指外展为 0），
 闭合时为下界（拇指外展为 1.5），与 `SimHandMapper` 的 open/closed 语义一致。
+按 `C` 或用 `Space` 从张开切换到抓握时，控制分为两阶段：先只旋转拇指
+CMC/虎口对掌轴，等待 `environment.teleop.thumb_lead_seconds`（默认 `0.12 s`），
+再闭合拇指两路屈肌腱与其余四指。按 `O`、`H` 或单独切换手指会取消尚未完成
+的分阶段闭合。
+
+每次环境复位都会显式清零 16 个手部关节并下发张开目标。正式检测到第一条
+机械臂或手部动作前，采集器还维护 `0.20 s`（50 Hz 下 10 帧）的张开状态滚动
+缓冲；录制启动时先写入这些帧，保证每个 episode 的起始观测和 action 都包含
+明确的张开手状态，而不是直接从闭合命令开始。
 第一次创建的数据默认位于 `data_aerohand_act_sim/rebot_act_cylinder`。
 
 平移步长为每个 50 Hz 周期 `0.003 m`，旋转步长为 `0.02 rad`。采集端对机械臂
@@ -271,13 +323,6 @@ python -m rebot_aerohand_right_act_sim.workflow.collect --episodes 20 --overwrit
 ```bash
 python -m rebot_aerohand_right_act_sim.workflow.inspect_dataset
 python -m rebot_aerohand_right_act_sim.workflow.replay --episode 0
-```
-
-部署推理默认也会在 MuJoCo 窗口左上角显示与当前策略观测同步的 IMU 曲线和手部
-接触力柱状图：
-
-```bash
-python -m rebot_aerohand_right_act_sim.workflow.deploy --seed 0
 ```
 
 部署和回放均可通过 `--render-every N` 降低 MuJoCo viewer 的渲染频率：
@@ -377,9 +422,71 @@ rebot_aerohand_right_act_sim/ckpt/act_sim_aerohand_cylinder/
 
 ### 5.5 部署
 
+部署默认执行 **50 次**随机化评估。每轮都会重置环境、策略缓存、手部平滑状态和
+可视化历史，并重新随机化圆柱位置。非负 seed 与数据采集规则一致，第 `i` 轮使用
+`base_seed + i`；`--seed -1` 则让每轮使用不可复现的随机位置。
+
+默认 50 次评估：
+
 ```bash
-python -m rebot_aerohand_right_act_sim.workflow.deploy --seed 0
+python -m rebot_aerohand_right_act_sim.workflow.deploy \
+  --checkpoint rebot_aerohand_right_act_sim/ckpt/act_sim_aerohand_cylinder/pretrained_model \
+  --num-rollouts 50 \
+  --seed 0
 ```
+
+`--num-rollouts` 的别名是 `--inference-count`。如需单次推理，可执行：
+
+```bash
+python -m rebot_aerohand_right_act_sim.workflow.deploy --num-rollouts 1 --seed 0
+```
+
+单轮超过 `--max-steps`（默认 800）仍未满足成功判定时计为失败，随后自动进入
+下一轮。所有轮次完成后输出成功数、失败数、成功率和成功轮次的平均策略步数。
+
+每次部署默认在指定权重 `pretrained_model` 的上一级目录保存评估结果：
+
+```text
+<checkpoint parent>/deploy_evaluations/<timestamp>/
+├── summary.json
+├── rollouts.csv
+├── rollout_001/
+│   ├── cameras.mp4
+│   ├── arm_joints.png
+│   ├── hand_actuators.png
+│   ├── hand_joints.png
+│   ├── imu.png
+│   ├── hand_contact_force.png
+│   ├── object_motion.png
+│   ├── tool_motion.png
+│   ├── grasp_distance.png
+│   └── result.json
+└── rollout_002/ ...
+```
+
+`cameras.mp4` 左右拼接保存顶部相机和手腕相机。推理过程不保存原始 NPZ，而是将
+机械臂实测关节/策略目标、手部执行器、手部关节、IMU、接触力、物体运动、末端
+运动和抓取距离分别绘制成上述 PNG 曲线图。`result.json` 保存单轮结果和曲线图
+文件列表，根目录的 JSON/CSV 汇总所有轮次和最终成功率。
+
+自定义输出目录：
+
+```bash
+python -m rebot_aerohand_right_act_sim.workflow.deploy \
+  --checkpoint rebot_aerohand_right_act_sim/ckpt/act_sim_aerohand_cylinder/pretrained_model \
+  --num-rollouts 50 \
+  --seed 0 \
+  --output-dir outputs/evaluation/run_001
+```
+
+只保存曲线图和汇总、不编码视频：
+
+```bash
+python -m rebot_aerohand_right_act_sim.workflow.deploy --no-save-video
+```
+
+部署读取 `environment.camera_render_hz`，并复用策略观测图像绘制画中画，避免 viewer
+为同一控制帧重复渲染相机。
 
 部署会根据 checkpoint 中的 `rebot_aerohand_right_multimodal.json` 自动判断
 是否需要 IMU/手部接触力，并据此决定是否启用每物理步的接触力累积。
@@ -465,8 +572,8 @@ python -m rebot_aerohand_right_act_sim.workflow.deploy \
 对机械臂也有整体延迟，数据量补足（10+ episodes）后建议重新对比
 `--temporal-ensemble 0.3` 或默认 0.9 是否已足够稳定，再决定是否放开。
 
-部署会在闭环中持续运行直到成功（圆柱与目标圆盘产生接触、手部张开、末端撤离
-并保持 0.5 秒）或达到 `--max-steps`（默认 800 步）。
+每轮部署会在闭环中持续运行，直到成功（圆柱与目标圆盘产生接触、手部张开、末端
+撤离并保持 0.5 秒）或达到 `--max-steps`；之后保存该轮结果并自动进入下一轮。
 
 ## 6. 与真机 ACT 的对应关系
 

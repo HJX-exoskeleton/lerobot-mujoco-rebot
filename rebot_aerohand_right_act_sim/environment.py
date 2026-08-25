@@ -749,6 +749,7 @@ class SimAeroHandACTEnvironment:
         seed: int | None = None,
         success_hold_seconds: float = 0.5,
         control_hz: int = FPS,
+        camera_render_hz: float | None = None,
         target_object_position_center: tuple[float, float, float]
         | list[float]
         | None = None,
@@ -756,12 +757,29 @@ class SimAeroHandACTEnvironment:
         hand_contact_processing: dict | None = None,
         teleop_motion_alpha: float = 0.25,
         hand_command_alpha: float = 0.25,
+        thumb_lead_seconds: float = 0.12,
         enable_hand_contact_processing: bool = True,
         show_grasp_marker: bool = True,
         camera_overlays: list[str] | None = None,
     ):
         self.model = mujoco.MjModel.from_xml_path(str(xml_path))
         self.data = mujoco.MjData(self.model)
+        self.control_hz = int(control_hz)
+        if self.control_hz <= 0:
+            raise ValueError("control_hz must be positive")
+        requested_camera_hz = (
+            float(self.control_hz)
+            if camera_render_hz is None
+            else float(camera_render_hz)
+        )
+        if requested_camera_hz <= 0:
+            raise ValueError("camera_render_hz must be positive")
+        self.camera_render_hz = min(requested_camera_hz, float(self.control_hz))
+        self._camera_render_stride = max(
+            1, int(round(float(self.control_hz) / self.camera_render_hz))
+        )
+        self._observation_count = 0
+        self._camera_frame_cache: dict[str, np.ndarray] = {}
         self.success_hold_steps = success_hold_steps(success_hold_seconds, control_hz)
         self._enable_hand_contact = bool(enable_hand_contact_processing)
         self.contact_config = HandContactProcessingConfig.from_mapping(
@@ -774,6 +792,10 @@ class SimAeroHandACTEnvironment:
         self.hand_command_alpha = float(hand_command_alpha)
         if not 0 < self.hand_command_alpha <= 1:
             raise ValueError("hand_command_alpha must be in (0, 1]")
+        self.thumb_lead_seconds = float(thumb_lead_seconds)
+        if self.thumb_lead_seconds < 0:
+            raise ValueError("thumb_lead_seconds must be nonnegative")
+        self._thumb_lead_until: float | None = None
         self._teleop_motion = np.zeros(6, dtype=np.float32)
 
         timestep = float(self.model.opt.timestep)
@@ -985,10 +1007,13 @@ class SimAeroHandACTEnvironment:
         self.hand_mapper.set_all_open()
         self._hand_target = self.hand_mapper.command_ctrl()
         self._hand_filtered = self._hand_target.copy()
+        self._thumb_lead_until = None
         self.hand_mapper.write(self.data, self._hand_target)
         self._set_controlled_object_positions(seed)
         self._physics_tick = 0
         self._success_count = 0
+        self._observation_count = 0
+        self._camera_frame_cache.clear()
         self.contact_processor.reset()
         self._teleop_motion.fill(0)
         mujoco.mj_forward(self.model, self.data)
@@ -1044,9 +1069,19 @@ class SimAeroHandACTEnvironment:
             hand_contact = self.contact_processor.consume()
         else:
             hand_contact = np.zeros(HAND_CONTACT_DIM, dtype=np.float32)
+        should_render = (
+            not self._camera_frame_cache
+            or self._observation_count % self._camera_render_stride == 0
+        )
+        if should_render:
+            self._camera_frame_cache = {
+                AGENT_CAMERA: self._render_camera(AGENT_CAMERA).copy(),
+                WRIST_CAMERA: self._render_camera(WRIST_CAMERA).copy(),
+            }
+        self._observation_count += 1
         observation = SimObservation(
-            image=self._render_camera(AGENT_CAMERA),
-            wrist_image=self._render_camera(WRIST_CAMERA),
+            image=self._camera_frame_cache[AGENT_CAMERA],
+            wrist_image=self._camera_frame_cache[WRIST_CAMERA],
             joint_position=np.asarray(
                 self.data.qpos[self.arm_qpos_adr], dtype=np.float32
             ),
@@ -1086,6 +1121,28 @@ class SimAeroHandACTEnvironment:
         glfw.KEY_5,
     )
 
+    def _cancel_staged_hand_close(self) -> None:
+        self._thumb_lead_until = None
+
+    def _start_staged_hand_close(self) -> None:
+        self.hand_mapper.set_all_closed()
+        self._thumb_lead_until = float(self.data.time) + self.thumb_lead_seconds
+
+    def _sequenced_hand_ctrl(self) -> np.ndarray:
+        ctrl = self.hand_mapper.command_ctrl()
+        if self._thumb_lead_until is None:
+            return ctrl
+        if float(self.data.time) >= self._thumb_lead_until:
+            self._thumb_lead_until = None
+            return ctrl
+
+        # Phase 1: rotate only the thumb CMC/opposition actuator (index 4).
+        # Four finger tendons (0:4) and thumb curl tendons (5:7) stay open.
+        open_ctrl = self.hand_mapper.open_ctrl
+        ctrl[0:4] = open_ctrl[0:4]
+        ctrl[5:7] = open_ctrl[5:7]
+        return ctrl
+
     def teleop_target(self) -> tuple[np.ndarray, bool]:
         viewer = self.viewer
         if viewer.is_key_pressed_once(glfw.KEY_Z):
@@ -1093,15 +1150,24 @@ class SimAeroHandACTEnvironment:
         if viewer.is_key_pressed_once(glfw.KEY_H):
             self.arm_controller.set_home(self.data)
             self.hand_mapper.set_all_open()
+            self._cancel_staged_hand_close()
         if viewer.is_key_pressed_once(glfw.KEY_SPACE):
             self.hand_mapper.toggle_grasp()
+            if np.all(self.hand_mapper.closed):
+                self._thumb_lead_until = (
+                    float(self.data.time) + self.thumb_lead_seconds
+                )
+            else:
+                self._cancel_staged_hand_close()
         if viewer.is_key_pressed_once(glfw.KEY_O):
             self.hand_mapper.set_all_open()
+            self._cancel_staged_hand_close()
         if viewer.is_key_pressed_once(glfw.KEY_C):
-            self.hand_mapper.set_all_closed()
+            self._start_staged_hand_close()
         for index, key in enumerate(self._FINGER_KEYS):
             if viewer.is_key_pressed_once(key):
                 self.hand_mapper.toggle_finger(index)
+                self._cancel_staged_hand_close()
 
         repeated_keys = {
             key for key in self._ARM_REPEAT_KEYS if viewer.is_key_repeat(key)
@@ -1113,7 +1179,7 @@ class SimAeroHandACTEnvironment:
         )
         self.arm_controller.apply_delta(self._teleop_motion)
         self.arm_controller.step(self.data)
-        self._hand_target = self.hand_mapper.command_ctrl()
+        self._hand_target = self._sequenced_hand_ctrl()
         target = np.concatenate(
             [
                 np.asarray(self.arm_controller.command_q, dtype=np.float32),
@@ -1139,6 +1205,32 @@ class SimAeroHandACTEnvironment:
             self.hand_mapper.ctrl_min,
             self.hand_mapper.ctrl_max,
         ).copy()
+
+    def scripted_target(
+        self, tool_position: np.ndarray, hand_target: np.ndarray
+    ) -> np.ndarray:
+        """Apply a scripted Cartesian/hand target and return its ACT action."""
+        tool_position = np.asarray(tool_position, dtype=np.float64)
+        hand_target = np.asarray(hand_target, dtype=np.float32)
+        if tool_position.shape != (3,) or not np.all(np.isfinite(tool_position)):
+            raise ValueError(f"invalid scripted tool position: {tool_position}")
+        if hand_target.shape != (HAND_ACTUATOR_DIM,) or not np.all(
+            np.isfinite(hand_target)
+        ):
+            raise ValueError(f"invalid scripted hand target: {hand_target}")
+        self.arm_controller.target_pos[:] = tool_position
+        self.arm_controller.step(self.data)
+        self._hand_target = np.clip(
+            hand_target,
+            self.hand_mapper.ctrl_min,
+            self.hand_mapper.ctrl_max,
+        ).copy()
+        return np.concatenate(
+            [
+                np.asarray(self.arm_controller.command_q, dtype=np.float32),
+                self._hand_target,
+            ]
+        ).astype(np.float32, copy=False)
 
     # --------------------------------------------------------------- render
     def grasp_surface_distance(self) -> float:
@@ -1189,6 +1281,7 @@ class SimAeroHandACTEnvironment:
         sensor_panel: np.ndarray | None = None,
         status_lines: tuple[str, str] | None = None,
         show_camera_overlays: bool = True,
+        camera_frames: list[tuple[str, np.ndarray]] | None = None,
     ) -> None:
         overlays: list[tuple[mujoco.mjtGridPos, str, str]] = []
         if teleop:
@@ -1216,11 +1309,12 @@ class SimAeroHandACTEnvironment:
                     text2,
                 )
             )
-        camera_frames = (
-            self._render_camera_overlays()
-            if show_camera_overlays and self._overlay_cameras
-            else None
-        )
+        if camera_frames is None:
+            camera_frames = (
+                self._render_camera_overlays()
+                if show_camera_overlays and self._overlay_cameras
+                else None
+            )
         self.viewer.sync(
             sensor_panel=sensor_panel,
             grasp_marker=self._grasp_marker(),

@@ -7,6 +7,9 @@ dataset:
 environment:
   xml: ./asset_rebot_aerohand_right/mujoco_xml/rebotarm_aerohand_act_cylinder.xml
   seed: 0
+  # State/action stay at 50 Hz; camera frames are rendered at 25 Hz and reused
+  # for the intervening control frame to reduce GPU/CPU rendering latency.
+  camera_render_hz: 25
   success_hold_seconds: 0.5
   object_randomization:
     target_object_position_center: [0.30, -0.10, 0.07]
@@ -14,6 +17,9 @@ environment:
   teleop:
     motion_alpha: 0.25
     hand_command_alpha: 0.25
+    # Closing sequence: rotate the thumb CMC/opposition axis first, then curl
+    # the thumb tendons and the other four fingers.
+    thumb_lead_seconds: 0.12
   # Picture-in-picture camera views stacked in the top-right corner of the
   # MuJoCo window (like the agent/egocentric PIP views of rebot_act_sim).
   camera_overlays: [top, cam_wrist]
