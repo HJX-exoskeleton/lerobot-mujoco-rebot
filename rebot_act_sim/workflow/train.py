@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import random
+from contextlib import nullcontext
 from collections import deque
 from pathlib import Path
 
@@ -13,6 +14,10 @@ _CACHE_ROOT = Path(__file__).resolve().parents[2] / "models"
 os.environ.setdefault("MPLCONFIGDIR", str(_CACHE_ROOT / ".matplotlib"))
 os.environ.setdefault("HF_HOME", str(_CACHE_ROOT / ".hf_home"))
 os.environ.setdefault("HF_HUB_CACHE", str(_CACHE_ROOT))
+os.environ.setdefault("HF_DATASETS_CACHE", str(_CACHE_ROOT / "datasets"))
+os.environ.setdefault("HF_XET_CACHE", str(_CACHE_ROOT / ".xet"))
+os.environ.setdefault("HF_ASSETS_CACHE", str(_CACHE_ROOT / ".assets"))
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 import matplotlib
@@ -26,6 +31,8 @@ from lerobot.common.datasets.lerobot_dataset import (
     LeRobotDataset,
     LeRobotDatasetMetadata,
 )
+from lerobot.common.datasets.utils import dataset_to_policy_features
+from torch.amp import GradScaler
 from tqdm.auto import tqdm
 
 from rebot_act_sim.config import (
@@ -75,6 +82,50 @@ def _save_metrics(output, history: list[float]) -> None:
     plt.close(figure)
 
 
+def _preflight(raw: dict, metadata, dataset, config, *, use_imu: bool, use_tactile: bool) -> None:
+    """Fail before a long run when collection and policy schemas diverge."""
+    expected = {"observation.image", "observation.wrist_image", "observation.state", "action"}
+    policy_features = set(dataset_to_policy_features(metadata.features))
+    if policy_features != expected:
+        raise ValueError(
+            "dataset ACT feature mismatch: "
+            f"expected={sorted(expected)}, actual={sorted(policy_features)}"
+        )
+    episodes_file = Path(dataset.root) / "meta" / "episodes.jsonl"
+    lengths = [
+        int(json.loads(line)["length"])
+        for line in episodes_file.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    if not lengths or min(lengths) < int(config.chunk_size):
+        raise ValueError(
+            f"shortest episode must contain at least chunk_size={config.chunk_size} frames; "
+            f"got {min(lengths) if lengths else 0}"
+        )
+    sample = dataset[0]
+    expected_shapes = {
+        "observation.image": (3, 256, 256),
+        "observation.wrist_image": (3, 256, 256),
+        "observation.state": (6,),
+        "action": (int(config.chunk_size), 7),
+    }
+    if use_imu:
+        expected_shapes["sensor.imu"] = (10,)
+    if use_tactile:
+        expected_shapes["sensor.tactile_left"] = (8, 16)
+        expected_shapes["sensor.tactile_right"] = (8, 16)
+    for key, shape in expected_shapes.items():
+        actual = tuple(sample[key].shape)
+        if actual != shape:
+            raise ValueError(f"{key} shape mismatch: expected={shape}, actual={actual}")
+    print(
+        "[TRAIN PREFLIGHT] "
+        f"episodes={dataset.num_episodes} frames={len(dataset)} "
+        f"chunk={config.chunk_size} action_steps={config.n_action_steps} "
+        f"IMU={use_imu} tactile={use_tactile}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
@@ -83,6 +134,7 @@ def main() -> None:
     parser.add_argument("--device")
     parser.add_argument("--imu", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--tactile", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--check-only", action="store_true")
     args = parser.parse_args()
     raw = load_config(args.config)
     training = raw["training"]
@@ -102,6 +154,11 @@ def main() -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     dataset_cfg = raw["dataset"]
     root = resolve_project_path(dataset_cfg["root"])
@@ -114,7 +171,6 @@ def main() -> None:
             f"control frequency {dataset_cfg['fps']} Hz"
         )
     config = build_act_config(raw, metadata)
-    device = _device(str(policy_raw["device"]))
     dataset = LeRobotDataset(
         str(dataset_cfg["repo_id"]),
         root=root,
@@ -122,25 +178,39 @@ def main() -> None:
     )
     if dataset.num_episodes <= 0:
         raise ValueError("dataset has no episodes")
+    _preflight(raw, metadata, dataset, config, use_imu=use_imu, use_tactile=use_tactile)
+    if args.check_only:
+        return
+    device = _device(str(policy_raw["device"]))
     policy = make_policy(
         config,
         metadata.stats,
         use_imu=use_imu,
         use_tactile=use_tactile,
         sensor_embed_dim=int(multimodal.get("sensor_embed_dim", 64)),
+        sensor_dropout=float(multimodal.get("sensor_dropout", 0.0)),
+        tactile_fusion_gain=float(multimodal.get("tactile_fusion_gain", 1.0)),
     ).to(device).train()
+    use_preset = bool(training.get("use_policy_training_preset", True))
+    preset = config.get_optimizer_preset()
     optimizer = torch.optim.AdamW(
-        policy.parameters(),
-        lr=float(training.get("learning_rate", 1e-4)),
-        weight_decay=float(training.get("weight_decay", 1e-4)),
+        policy.get_optim_params() if use_preset else policy.parameters(),
+        lr=float(preset.lr if use_preset else training.get("learning_rate", 1e-5)),
+        weight_decay=float(
+            preset.weight_decay if use_preset else training.get("weight_decay", 1e-4)
+        ),
     )
+    use_amp = bool(training.get("use_amp", False)) and device.type == "cuda"
+    grad_clip_norm = float(training.get("grad_clip_norm", 10.0))
+    scaler = GradScaler(device.type, enabled=use_amp)
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=int(training.get("num_workers", 0)),
         pin_memory=device.type == "cuda",
-        drop_last=True,
+        drop_last=False,
+        persistent_workers=int(training.get("num_workers", 0)) > 0,
     )
     if len(loader) == 0:
         raise ValueError("dataset is smaller than one batch; reduce batch_size")
@@ -159,10 +229,14 @@ def main() -> None:
             key: value.to(device, non_blocking=True) if isinstance(value, torch.Tensor) else value
             for key, value in batch.items()
         }
-        loss, _ = policy(batch)
         optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
+        with torch.autocast(device_type=device.type) if use_amp else nullcontext():
+            loss, _ = policy(batch)
+        scaler.scale(loss).backward()
+        scaler.unscale_(optimizer)
+        grad_norm = torch.nn.utils.clip_grad_norm_(policy.parameters(), grad_clip_norm)
+        scaler.step(optimizer)
+        scaler.update()
         value = float(loss.item())
         history.append(value)
         progress.set_postfix(loss=f"{value:.4f}")
@@ -173,7 +247,10 @@ def main() -> None:
             if use_tactile:
                 write_or_validate_processing_spec(checkpoint, tactile_processing)
         if step % int(training.get("log_freq", 50)) == 0:
-            progress.write(f"step={step} loss={value:.5f}")
+            progress.write(
+                f"step={step} loss={value:.5f} grad_norm={float(grad_norm):.4f} "
+                f"lr={optimizer.param_groups[0]['lr']:.2e}"
+            )
 
     # Always persist the final training step regardless of save_freq alignment.
     final_step_ckpt = output / "checkpoints" / f"step_{steps:06d}"

@@ -297,11 +297,11 @@ python -m rebot_act_sim.workflow.inspect_dataset
 python -m rebot_act_sim.workflow.replay --episode 0
 ```
 
-部署推理默认也会在 MuJoCo 窗口左上角显示与当前策略观测同步的 IMU 曲线和左右
-`8×16` 处理后触觉热图：
+部署推理默认只显示 MuJoCo 仿真界面，不显示相机、IMU 或触觉面板。策略仍会正常
+读取相机、IMU 与左右 `8×16` 触觉输入；这里只关闭额外的显示开销。需要显示时：
 
 ```bash
-python -m rebot_act_sim.workflow.deploy --seed 0
+python -m rebot_act_sim.workflow.deploy --seed 0 --sensors
 ```
 
 部署和回放均可通过 `--render-every N` 降低 MuJoCo viewer 的渲染频率：
@@ -313,9 +313,12 @@ python -m rebot_act_sim.workflow.replay --episode 0 --render-every 2
 
 `--render-every` 设为大于 1 的值时，每 N 个控制周期才执行一次 `env.render()`，
 非渲染帧只推进物理和策略推理，跳过 MuJoCo 画面更新。默认 `1` 保持每帧渲染。
-如需完全关闭传感器面板（同时关闭 MuJoCo 画面更新时除外），可添加 `--no-sensors`。
+部署传感器面板默认关闭，也可显式使用 `--no-sensors`。
 面板显示的是送入策略的当前 `sensor.imu`、`sensor.tactile_left/right`，不是
 上一帧或数据集缓存。
+
+MuJoCo 窗口支持物体扰动：双击物体完成选取，随后按住 `Ctrl+右键` 拖动平移，
+按住 `Ctrl+左键` 拖动旋转。普通左/右键拖动仍用于调整自由相机。
 
 检查器逐帧验证图像、shape、dtype、有限值和夹爪范围，并报告触觉全零帧数。
 抓取前触觉为零是正常的；如果所有帧均为零，应检查碰撞和传感器 XML。
@@ -353,6 +356,14 @@ python -m rebot_act_sim.workflow.replay --episode 0 --speed 2.0  # 二倍速
 
 ### 5.3 训练视觉 ACT
 
+训练入口会先执行与真机 ACT 项目同级别的预检：校验数据集 FPS、策略字段、
+episode 最短长度、未来动作窗口以及图像、关节、IMU、左右触觉 shape。只检查
+而不启动训练可运行：
+
+```bash
+python -m rebot_act_sim.workflow.train --check-only --imu --tactile
+```
+
 ```bash
 python -m rebot_act_sim.workflow.train
 ```
@@ -381,6 +392,17 @@ python -m rebot_act_sim.workflow.train --imu --tactile
 触觉经过保留二维结构的 CNN；编码结果拼接成一个
 `observation.environment_state` token，交给 ACT Transformer。
 
+训练循环已与验证无误的 `rebot_act_real` 逻辑对齐：默认采用 ACT 自带 AdamW
+预设（学习率 `1e-5`）、梯度范数裁剪、CUDA TF32/卷积优化，并保留最后一个
+不满 batch 的数据批次。`multimodal.sensor_dropout` 会在训练时随机屏蔽完整传感器
+分支，避免仿真中接触状态与任务阶段强相关而形成“触觉二值开关”；
+`tactile_fusion_gain` 则限制触觉 token 压过视觉和关节状态。两项参数都会保存在
+checkpoint 中并由部署自动恢复。
+
+旧多模态 checkpoint 不会因代码升级而自动获得这些训练约束。若旧权重表现为
+只下沉、输出固定，或动作只随有无触觉切换，需要用新配置重新训练，而不是继续
+调整旧权重的部署参数。
+
 训练过程中按 `save_freq` 间隔保存中间 checkpoint（如 `step_002000`、`step_004000`），
 训练循环结束后**始终保存最终步 checkpoint**（`checkpoints/step_{total_steps:06d}`）
 以及 `pretrained_model`（eval 模式）。无论 `total_steps` 是否被 `save_freq` 整除，
@@ -404,8 +426,33 @@ python -m rebot_act_sim.workflow.deploy --seed 0
 ```
 
 部署会根据 checkpoint 中的 `rebot_sim_multimodal.json` 自动判断是否需要
-IMU/触觉，并据此决定是否启用 50 Hz 距离触觉计算。默认每个控制周期重新
-预测动作块，并以系数 0.9 做时间集合。
+IMU/触觉，并据此决定是否启用 50 Hz 距离触觉计算。部署控制与
+`rebot_aerohand_right_act_sim` 对齐：`n_action_steps=1`，使用 ACT 原生时间集成；
+当前任务默认采用实际验证可抓取的 `temporal_ensemble=0.01`，不对夹爪输出增加补偿。
+相机与采集保持 `camera_render_hz=25`，两个 50 Hz 控制帧共享同一相机图像，避免
+部署阶段相机时序分布变化并降低渲染负载。
+
+```bash
+python -m rebot_act_sim.workflow.deploy --seed 0 --temporal-ensemble 0.01
+```
+
+部署和真机项目一样从 checkpoint 自带的 `config.json` 恢复 ACT 网络、
+`chunk_size` 与 `n_action_steps`，不会使用当前 YAML 重建旧权重结构。
+仿真部署默认 `n_action_steps=1`，可用 `--n-action-steps` 显式修改。部署不会对
+六关节或夹爪预测添加补偿、滤波或二次整形，动作按采集/replay 相同语义直接交给
+`env.command()`。自动采集在张开夹爪后包含 0.5 秒 `settle released` 阶段；部署也
+会在首次松爪命令后仅保持六关节 0.5 秒，再允许撤离，夹爪输出始终使用策略原值。
+可用 `--release-settle-seconds` 调整或设为 0 禁用。指定
+`--temporal-ensemble [系数]` 时会按 LeRobot ACT 要求将 `n_action_steps` 设为 1。
+XML 负责场景和执行机构，不再隐式改变 checkpoint 的策略特征定义。
+
+如需显式使用默认逐步闭环设置：
+
+```bash
+python -m rebot_act_sim.workflow.deploy --seed 0 \
+  --n-action-steps 1 --temporal-ensemble 0.01 \
+  --release-settle-seconds 0.5
+```
 
 **性能优化**（为保障 50 Hz 实时性）：
 
@@ -423,8 +470,8 @@ python -m rebot_act_sim.workflow.deploy --seed 0
 # 每两帧渲染一次 MuJoCo 画面
 python -m rebot_act_sim.workflow.deploy --seed 0 --render-every 2
 
-# 完全关闭传感器面板
-python -m rebot_act_sim.workflow.deploy --seed 0 --no-sensors
+# 显示相机、IMU和触觉面板（默认关闭）
+python -m rebot_act_sim.workflow.deploy --seed 0 --sensors
 
 # 强制禁用触觉处理（即使 checkpoint 编码了触觉分支）
 python -m rebot_act_sim.workflow.deploy --seed 0 --no-tactile
@@ -434,7 +481,9 @@ python -m rebot_act_sim.workflow.deploy --checkpoint rebot_act_sim/ckpt/act_sim_
 ```
 
 部署会在闭环中持续运行直到成功（方块放置到盘子上且夹爪打开、末端撤离并保持
-0.5 秒）或达到 `--max-steps`（默认 800 步）。
+0.5 秒）或达到 `--max-steps`（默认 800 步）。结束时会输出末端/物体位移、动作
+范围和最后动作。如果 `min` 与 `max` 七维都相同，说明 checkpoint 已退化为恒定
+动作输出，应使用本节新版多模态训练约束重新训练，而不是继续调整 MuJoCo 控制器。
 
 ## 6. 与真机 ACT 的对应关系
 

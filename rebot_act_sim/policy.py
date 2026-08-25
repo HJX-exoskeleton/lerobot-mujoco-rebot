@@ -20,6 +20,8 @@ def make_policy(
     use_imu: bool = False,
     use_tactile: bool = False,
     sensor_embed_dim: int = 64,
+    sensor_dropout: float = 0.0,
+    tactile_fusion_gain: float = 1.0,
 ):
     if use_imu or use_tactile:
         return MultimodalACTPolicy(
@@ -28,6 +30,8 @@ def make_policy(
             use_imu=use_imu,
             use_tactile=use_tactile,
             sensor_embed_dim=sensor_embed_dim,
+            sensor_dropout=sensor_dropout,
+            tactile_fusion_gain=tactile_fusion_gain,
         )
     return ACTPolicy(config, dataset_stats=dataset_stats)
 

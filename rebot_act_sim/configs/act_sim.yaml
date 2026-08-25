@@ -44,14 +44,21 @@ multimodal:
   use_imu: false
   use_tactile: false
   sensor_embed_dim: 64
+  # Simulation contact is highly phase-correlated. Whole-modality dropout
+  # prevents the policy from collapsing to a tactile-only binary controller.
+  sensor_dropout: 0.15
+  tactile_fusion_gain: 0.5
 
 training:
   output_dir: ./rebot_act_sim/ckpt/act_sim_red_cube
   steps: 8000
   batch_size: 4
   num_workers: 8
-  learning_rate: 0.0001
+  use_policy_training_preset: true
+  learning_rate: 0.00001
   weight_decay: 0.0001
+  grad_clip_norm: 10.0
+  use_amp: false
   seed: 42
   log_freq: 50
   save_freq: 2000

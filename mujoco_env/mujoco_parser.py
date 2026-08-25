@@ -158,6 +158,41 @@ class MinimalCallbacks:
                 self._right_double_click_pressed = True
             self._last_right_click_time = time_now
 
+        # A double click must update MjvPerturb.select; merely recording the
+        # click flag (the previous behavior) does not make the body draggable.
+        if self._left_double_click_pressed or self._right_double_click_pressed:
+            width, height = glfw.get_framebuffer_size(window)
+            if width > 0 and height > 0:
+                selected_point = np.zeros(3, dtype=np.float64)
+                geom_id = np.full(1, -1, dtype=np.int32)
+                flex_id = np.full(1, -1, dtype=np.int32)
+                skin_id = np.full(1, -1, dtype=np.int32)
+                with self._gui_lock:
+                    body_id = mujoco.mjv_select(
+                        self.model,
+                        self.data,
+                        self.vopt,
+                        width / height,
+                        float(self._scale * x) / width,
+                        1.0 - float(self._scale * y) / height,
+                        self.scn,
+                        selected_point,
+                        geom_id,
+                        flex_id,
+                        skin_id,
+                    )
+                    self.pert.select = max(int(body_id), 0)
+                    self.pert.flexselect = int(flex_id[0])
+                    self.pert.skinselect = int(skin_id[0])
+                    if body_id > 0:
+                        rotation = self.data.xmat[body_id].reshape(3, 3)
+                        self.pert.localpos[:] = rotation.T @ (
+                            selected_point - self.data.xpos[body_id]
+                        )
+                        mujoco.mjv_initPerturb(
+                            self.model, self.data, self.scn, self.pert
+                        )
+
         # set perturbation
         key = mods == glfw.MOD_CONTROL
         newperturb = 0

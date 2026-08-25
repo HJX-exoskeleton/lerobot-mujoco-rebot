@@ -59,12 +59,20 @@ class MultimodalACTPolicy(ACTPolicy):
         use_imu: bool,
         use_tactile: bool,
         sensor_embed_dim: int = 64,
+        sensor_dropout: float = 0.0,
+        tactile_fusion_gain: float = 1.0,
     ):
         if not use_imu and not use_tactile:
             raise ValueError("multimodal ACT requires IMU and/or tactile input")
         self.use_imu = bool(use_imu)
         self.use_tactile = bool(use_tactile)
         self.sensor_embed_dim = int(sensor_embed_dim)
+        self.sensor_dropout = float(sensor_dropout)
+        self.tactile_fusion_gain = float(tactile_fusion_gain)
+        if not 0.0 <= self.sensor_dropout < 1.0:
+            raise ValueError("sensor_dropout must be in [0, 1)")
+        if self.tactile_fusion_gain <= 0.0:
+            raise ValueError("tactile_fusion_gain must be positive")
         fusion_dim = self.sensor_embed_dim * (self.use_imu + self.use_tactile)
         config.input_features = dict(config.input_features)
         config.input_features[SENSOR_FEATURE_KEY] = PolicyFeature(
@@ -108,7 +116,25 @@ class MultimodalACTPolicy(ACTPolicy):
                 batch["sensor.tactile_right"].float() - self.tactile_right_mean
             ) / self.tactile_right_std
             value = torch.stack([left, right], dim=1)
-            embeddings.append(self.tactile_encoder(value))
+            embeddings.append(self.tactile_encoder(value) * self.tactile_fusion_gain)
+        # Drop complete modality tokens, rather than individual taxels. In the
+        # scripted simulator tactile contact is strongly correlated with task
+        # phase; modality dropout prevents ACT from learning a tactile-only
+        # open/contact lookup table and forces vision/state to remain useful.
+        if self.training and self.sensor_dropout > 0.0:
+            embeddings = [
+                embedding
+                * (
+                    torch.rand(
+                        (embedding.shape[0], 1),
+                        device=embedding.device,
+                        dtype=embedding.dtype,
+                    )
+                    >= self.sensor_dropout
+                )
+                / (1.0 - self.sensor_dropout)
+                for embedding in embeddings
+            ]
         result = dict(batch)
         result[SENSOR_FEATURE_KEY] = torch.cat(embeddings, dim=-1)
         return result
@@ -125,10 +151,12 @@ class MultimodalACTPolicy(ACTPolicy):
         Path(save_directory, MULTIMODAL_CONFIG_NAME).write_text(
             json.dumps(
                 {
-                    "format_version": 1,
+                    "format_version": 2,
                     "use_imu": self.use_imu,
                     "use_tactile": self.use_tactile,
                     "sensor_embed_dim": self.sensor_embed_dim,
+                    "sensor_dropout": self.sensor_dropout,
+                    "tactile_fusion_gain": self.tactile_fusion_gain,
                 },
                 indent=2,
             ),
@@ -146,6 +174,8 @@ def load_multimodal_spec(checkpoint: str | Path) -> dict:
         "use_imu": bool(value["use_imu"]),
         "use_tactile": bool(value["use_tactile"]),
         "sensor_embed_dim": int(value.get("sensor_embed_dim", 64)),
+        "sensor_dropout": float(value.get("sensor_dropout", 0.0)),
+        "tactile_fusion_gain": float(value.get("tactile_fusion_gain", 1.0)),
     }
 
 
