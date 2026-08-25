@@ -25,6 +25,14 @@ from rebot_act_sim.timing import WallClockRate
 from rebot_act_sim.visualization import AsyncSensorVisualizer, ReplaySensorVisualizer
 
 
+def _pitch_rotation(angle: float) -> np.ndarray:
+    cosine, sine = np.cos(angle), np.sin(angle)
+    return np.asarray(
+        [[cosine, 0.0, sine], [0.0, 1.0, 0.0], [-sine, 0.0, cosine]],
+        dtype=np.float64,
+    )
+
+
 def _smoothstep(value: float) -> float:
     value = float(np.clip(value, 0.0, 1.0))
     # Quintic minimum-jerk blend: position, velocity and acceleration are all
@@ -38,10 +46,27 @@ class _AutoStage:
     duration: float
     tool_target: np.ndarray
     gripper_target: float
+    pitch_target: float = 0.0
 
 
 class _AutoCollector:
     """Scripted randomized red-cube pick-and-place demonstrator."""
+
+    # Keep the original reset orientation: the B601 gripper approaches the
+    # tabletop vertically downward. Position alignment is handled separately
+    # from orientation and must converge before the fingers may close.
+    GRASP_PITCH = 0.0
+    # Keep the collision envelope off the tabletop and bias the grasp away
+    # from the robot (the observed forward direction in this task scene).
+    GRASP_HEIGHT_OFFSET = 0.016
+    GRASP_FORWARD_OFFSET = 0.015
+    GRASP_CENTER_GATE = 0.012
+    MAX_GRASP_WAIT_RETRIES = 20
+
+    # Release with the object bottom this far above the plate.  The short
+    # gravity drop produces a clean placement demonstration without driving
+    # the fingers, object or plate into one another.
+    RELEASE_CLEARANCE = 0.045
 
     def __init__(self, env: SimACTEnvironment, speed: float):
         self.env = env
@@ -49,6 +74,8 @@ class _AutoCollector:
         model, data = env.parser.model, env.parser.data
         self.object_body = int(model.body("body_obj_mug_5").id)
         self.object_geom = int(model.geom("geom_obj_red_cube").id)
+        self.robot_base_body = int(model.body("base_link").id)
+        self.end_link_body = int(model.body("end_link").id)
         self.plate_body = int(model.body("body_obj_plate_11").id)
         self.plate_top_site = mujoco.mj_name2id(
             model, mujoco.mjtObj.mjOBJ_SITE, "top_site_plate_11"
@@ -57,16 +84,18 @@ class _AutoCollector:
             raise RuntimeError("auto collection requires site 'top_site_plate_11'")
 
         tcp = np.asarray(env.task.p0, dtype=np.float64).copy()
-        left_pad = data.geom_xpos[model.geom("touch_base_left").id]
-        right_pad = data.geom_xpos[model.geom("touch_base_right").id]
+        self.base_rotation = np.asarray(env.task.R0, dtype=np.float64).copy()
+        self.grasp_site = int(model.site("grasp_center").id)
+        left_pad = np.asarray(
+            data.geom_xpos[model.geom("touch_base_left").id], dtype=np.float64
+        )
+        right_pad = np.asarray(
+            data.geom_xpos[model.geom("touch_base_right").id], dtype=np.float64
+        )
         pad_center = 0.5 * (left_pad + right_pad)
-        self.pad_offset = pad_center - tcp
-        object_position = data.xpos[self.object_body].copy()
-        grasp = object_position - self.pad_offset
-        # Keep the lower finger surfaces clear of the tabletop.  The pads are
-        # slightly above the cube centre and still overlap enough of the cube
-        # height to produce a stable pinch.
-        grasp[2] += 0.016
+        pad_offset = pad_center - tcp
+        desired_grasp_point = self._desired_grasp_point()
+        grasp = desired_grasp_point - pad_offset
         above_object = grasp + np.asarray([0.0, 0.0, 0.16])
         lift = grasp + np.asarray([0.0, 0.0, 0.18])
 
@@ -78,25 +107,28 @@ class _AutoCollector:
         placeholder = lift.copy()
         self.stages = [
             _AutoStage("settle open", seconds(0.6), tcp, 0.0),
-            _AutoStage("move above object", seconds(1.8), above_object, 0.0),
-            _AutoStage("lower to grasp", seconds(1.4), grasp, 0.0),
-            _AutoStage("close gripper", seconds(1.0), grasp, 1.0),
-            _AutoStage("settle grasp", seconds(0.6), grasp, 1.0),
-            _AutoStage("lift", seconds(1.5), lift, 1.0),
-            _AutoStage("move above plate", seconds(2.0), placeholder.copy(), 1.0),
-            _AutoStage("settle above plate", seconds(0.5), placeholder.copy(), 1.0),
-            _AutoStage("lower onto plate", seconds(1.4), placeholder.copy(), 1.0),
-            _AutoStage("center on plate", seconds(0.8), placeholder.copy(), 1.0),
-            _AutoStage("release", seconds(1.0), placeholder.copy(), 0.0),
-            _AutoStage("settle released", seconds(0.5), placeholder.copy(), 0.0),
-            _AutoStage("retreat", seconds(1.2), placeholder.copy(), 0.0),
-            _AutoStage("verify", seconds(0.8), placeholder.copy(), 0.0),
+            _AutoStage("move above object", seconds(2.0), above_object, 0.0, self.GRASP_PITCH),
+            _AutoStage("lower to grasp", seconds(1.5), grasp, 0.0, self.GRASP_PITCH),
+            _AutoStage("wait for grasp center", seconds(0.5), grasp, 0.0, self.GRASP_PITCH),
+            _AutoStage("close gripper", seconds(1.0), grasp, 1.0, self.GRASP_PITCH),
+            _AutoStage("settle grasp", seconds(0.6), grasp, 1.0, self.GRASP_PITCH),
+            _AutoStage("lift", seconds(1.5), lift, 1.0, self.GRASP_PITCH),
+            _AutoStage("move above plate", seconds(2.0), placeholder.copy(), 1.0, self.GRASP_PITCH),
+            _AutoStage("settle above plate", seconds(0.5), placeholder.copy(), 1.0, self.GRASP_PITCH),
+            _AutoStage("lower to release height", seconds(1.5), placeholder.copy(), 1.0, self.GRASP_PITCH),
+            _AutoStage("stabilize over plate center", seconds(0.7), placeholder.copy(), 1.0, self.GRASP_PITCH),
+            _AutoStage("release", seconds(1.0), placeholder.copy(), 0.0, self.GRASP_PITCH),
+            _AutoStage("settle released", seconds(0.8), placeholder.copy(), 0.0, self.GRASP_PITCH),
+            _AutoStage("retreat", seconds(1.2), placeholder.copy(), 0.0, self.GRASP_PITCH),
+            _AutoStage("verify", seconds(0.8), placeholder.copy(), 0.0, self.GRASP_PITCH),
         ]
         self.index = 0
         self.stage_start = float(data.time)
         self.start_tool = tcp.copy()
         self.start_gripper = 0.0
+        self.start_pitch = 0.0
         self.finished = False
+        self._grasp_wait_retries = 0
         self._transport_compensated = False
         self._last_target = np.concatenate(
             [
@@ -108,6 +140,19 @@ class _AutoCollector:
             ]
         ).astype(np.float32)
         self._announce()
+
+    def _desired_grasp_point(self) -> np.ndarray:
+        """Return a table-safe point at the object centre/front boundary."""
+        data = self.env.parser.data
+        point = np.asarray(data.geom_xpos[self.object_geom], dtype=np.float64).copy()
+        base_xy = np.asarray(data.xpos[self.robot_base_body, :2], dtype=np.float64)
+        forward_xy = point[:2] - base_xy
+        norm = float(np.linalg.norm(forward_xy))
+        if norm < 1e-9:
+            raise RuntimeError("object and robot base must have distinct XY positions")
+        point[:2] += self.GRASP_FORWARD_OFFSET * forward_xy / norm
+        point[2] += self.GRASP_HEIGHT_OFFSET
+        return point
 
     @property
     def phase(self) -> str:
@@ -128,7 +173,11 @@ class _AutoCollector:
             model.geom(self.object_geom)
         )
         return np.asarray(
-            [plate[0], plate[1], top_z + cube_half_height + 0.004]
+            [
+                plate[0],
+                plate[1],
+                top_z + cube_half_height + self.RELEASE_CLEARANCE,
+            ]
         )
 
     def _compensate_transport_targets(self, *, include_above: bool) -> None:
@@ -140,9 +189,14 @@ class _AutoCollector:
         """
         data = self.env.parser.data
         desired_object = self._desired_object_on_plate()
-        object_position = data.xpos[self.object_body].copy()
-        commanded_tcp = np.asarray(self.env.task.p0, dtype=np.float64).copy()
-        place = commanded_tcp + desired_object - object_position
+        object_position = data.geom_xpos[self.object_geom].copy()
+        # Use the measured end-link pose. The IK target (task.p0) can differ
+        # materially from the simulated TCP during transport; using the
+        # command here over-corrects the carried object's destination.
+        measured_tcp = np.asarray(
+            data.xpos[self.end_link_body], dtype=np.float64
+        ).copy()
+        place = measured_tcp + desired_object - object_position
         above = place + np.asarray([0.0, 0.0, 0.16])
         retreat = place + np.asarray([0.0, 0.0, 0.18])
         for stage in self.stages:
@@ -152,8 +206,8 @@ class _AutoCollector:
             ):
                 stage.tool_target[:] = above
             elif stage.name in (
-                "lower onto plate",
-                "center on plate",
+                "lower to release height",
+                "stabilize over plate center",
                 "release",
                 "settle released",
             ):
@@ -173,10 +227,45 @@ class _AutoCollector:
         gripper = self.start_gripper + blend * (
             stage.gripper_target - self.start_gripper
         )
-        target = self.env.scripted_target(tool, gripper)
+        pitch = self.start_pitch + blend * (stage.pitch_target - self.start_pitch)
+        tool_rotation = self.base_rotation @ _pitch_rotation(pitch)
+        target = self.env.scripted_target(tool, gripper, tool_rotation)
         self._last_target = target.copy()
         if elapsed < stage.duration:
             return target
+
+        if stage.name == "wait for grasp center":
+            data = self.env.parser.data
+            center_error = float(
+                np.linalg.norm(
+                    data.site_xpos[self.grasp_site]
+                    - data.geom_xpos[self.object_geom]
+                )
+            )
+            if center_error > self.GRASP_CENTER_GATE:
+                self._grasp_wait_retries += 1
+                if self._grasp_wait_retries <= self.MAX_GRASP_WAIT_RETRIES:
+                    self.stage_start = float(data.time)
+                    self.start_tool = stage.tool_target.copy()
+                    self.start_gripper = 0.0
+                    self.start_pitch = self.GRASP_PITCH
+                    print(
+                        "[AUTO GRASP] waiting with gripper open; "
+                        f"grasp_center error={center_error:.4f} m "
+                        f"({self._grasp_wait_retries}/"
+                        f"{self.MAX_GRASP_WAIT_RETRIES})"
+                    )
+                    return target
+                print(
+                    "[AUTO GRASP] grasp_center did not enter the 12 mm "
+                    "centre region; ending episode without closing"
+                )
+                self.finished = True
+                return target
+            print(
+                "[AUTO GRASP] grasp_center is near object centre; "
+                f"error={center_error:.4f} m, closing gripper"
+            )
 
         self.index += 1
         if self.index >= len(self.stages):
@@ -187,11 +276,12 @@ class _AutoCollector:
             and not self._transport_compensated
         ):
             self._compensate_transport_targets(include_above=True)
-        elif self.stages[self.index].name in ("lower onto plate", "center on plate"):
+        elif self.stages[self.index].name == "lower to release height":
             self._compensate_transport_targets(include_above=False)
         self.stage_start = float(self.env.parser.data.time)
         self.start_tool = stage.tool_target.copy()
         self.start_gripper = float(stage.gripper_target)
+        self.start_pitch = float(stage.pitch_target)
         self._announce()
         return target
 
@@ -239,6 +329,12 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Automatic trajectory speed multiplier (default: 1.0).",
     )
     parser.add_argument(
+        "--warmup-seconds",
+        type=float,
+        default=1.0,
+        help="Simulation warmup before any data is recorded (default: 1.0).",
+    )
+    parser.add_argument(
         "--render-every",
         type=int,
         default=2,
@@ -265,6 +361,8 @@ def main() -> None:
     # useful Python context. This prints all Python thread stacks on SIGSEGV.
     faulthandler.enable(all_threads=True)
     args = build_argparser().parse_args()
+    if args.warmup_seconds < 0:
+        raise ValueError("--warmup-seconds must be nonnegative")
     raw = load_config(args.config)
     dataset_cfg = raw["dataset"]
     environment_cfg = raw["environment"]
@@ -326,11 +424,12 @@ def main() -> None:
     reset_count = 0
     render_every = max(1, int(args.render_every))
     auto = _AutoCollector(env, args.auto_speed) if args.auto_collect else None
+    warmup_end_time = float(env.parser.data.time) + args.warmup_seconds
     if auto is not None:
-        recording = True
+        auto.stage_start = warmup_end_time
         print(
             f"[AUTO] scripted collection enabled; speed={args.auto_speed:g}x; "
-            f"episodes={args.episodes}"
+            f"episodes={args.episodes}; warmup={args.warmup_seconds:g}s"
         )
     try:
         while env.is_alive() and episode < args.episodes:
@@ -338,6 +437,40 @@ def main() -> None:
             if not env.is_control_tick(int(dataset_cfg.get("fps", FPS))):
                 continue
             observation = env.observe()
+            if observation.sim_time < warmup_end_time:
+                # Warmup is a fully running visualization interval: physics,
+                # cameras, IMU and tactile processing all advance normally.
+                # Only action generation and dataset writes are withheld so
+                # the reset transient is not learned by the policy.
+                if async_sensor_visualizer is not None:
+                    async_sensor_visualizer.push(
+                        observation.imu,
+                        observation.tactile_left,
+                        observation.tactile_right,
+                        frame_index=control_frame,
+                        timestamp=observation.sim_time,
+                    )
+                if control_frame % render_every == 0:
+                    sensor_panel = (
+                        async_sensor_visualizer.get_panel()
+                        if async_sensor_visualizer is not None
+                        else None
+                    )
+                    if sensor_panel is None:
+                        sensor_panel = sensor_visualizer.render(
+                            observation.imu,
+                            observation.tactile_left,
+                            observation.tactile_right,
+                            frame_index=control_frame,
+                            timestamp=observation.sim_time,
+                        )
+                    env.render(teleop=auto is None, sensor_panel=sensor_panel)
+                control_frame += 1
+                rate.wait()
+                continue
+            if auto is not None and not recording:
+                recording = True
+                print(f"Recording episode {episode} after simulation warmup")
             if auto is None:
                 target, reset_requested = env.teleop_target()
             else:
@@ -353,10 +486,15 @@ def main() -> None:
                     if args.auto_collect
                     else None
                 )
+                warmup_end_time = (
+                    float(env.parser.data.time) + args.warmup_seconds
+                )
+                if auto is not None:
+                    auto.stage_start = warmup_end_time
                 sensor_visualizer.reset()
                 if async_sensor_visualizer is not None:
                     async_sensor_visualizer.reset()
-                recording = auto is not None
+                recording = False
                 frame_count = 0
                 print("Discarded current episode")
                 continue
@@ -406,10 +544,15 @@ def main() -> None:
                     if args.auto_collect and episode < args.episodes
                     else None
                 )
+                warmup_end_time = (
+                    float(env.parser.data.time) + args.warmup_seconds
+                )
+                if auto is not None:
+                    auto.stage_start = warmup_end_time
                 sensor_visualizer.reset()
                 if async_sensor_visualizer is not None:
                     async_sensor_visualizer.reset()
-                recording = auto is not None
+                recording = False
                 frame_count = 0
             elif recording and frame_count >= args.max_frames:
                 writer.discard_episode()
@@ -421,10 +564,15 @@ def main() -> None:
                     if args.auto_collect
                     else None
                 )
+                warmup_end_time = (
+                    float(env.parser.data.time) + args.warmup_seconds
+                )
+                if auto is not None:
+                    auto.stage_start = warmup_end_time
                 sensor_visualizer.reset()
                 if async_sensor_visualizer is not None:
                     async_sensor_visualizer.reset()
-                recording = auto is not None
+                recording = False
                 frame_count = 0
                 print("Discarded episode after reaching --max-frames")
             rate.wait()

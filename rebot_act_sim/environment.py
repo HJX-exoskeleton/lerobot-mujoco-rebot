@@ -26,6 +26,21 @@ TRANSLATION_STEP = 0.003
 ROTATION_STEP = 0.02
 
 
+def _rotation_to_rpy(rotation: np.ndarray) -> np.ndarray:
+    """Convert a rotation matrix to XYZ roll/pitch/yaw without GUI imports."""
+    return np.asarray(
+        [
+            np.arctan2(rotation[2, 1], rotation[2, 2]),
+            np.arctan2(
+                -rotation[2, 0],
+                np.hypot(rotation[2, 1], rotation[2, 2]),
+            ),
+            np.arctan2(rotation[1, 0], rotation[0, 0]),
+        ],
+        dtype=np.float64,
+    )
+
+
 @dataclass(frozen=True)
 class SimObservation:
     image: np.ndarray
@@ -541,23 +556,35 @@ class SimACTEnvironment:
         self.task.step(action)
 
     def scripted_target(
-        self, tool_position: np.ndarray, gripper_closed: float
+        self,
+        tool_position: np.ndarray,
+        gripper_closed: float,
+        tool_rotation: np.ndarray | None = None,
     ) -> np.ndarray:
         """Convert an absolute Cartesian waypoint into the normal 7-D action.
 
-        Orientation remains at the reset/teleoperation target. The returned
-        action is exactly the joint/gripper command sent to the simulator and
-        can therefore be written directly to an ACT demonstration.
+        ``tool_rotation`` is an optional absolute world-frame rotation. The
+        returned action is exactly the joint/gripper command sent to the
+        simulator and can therefore be written directly to an ACT
+        demonstration.
         """
         tool_position = np.asarray(tool_position, dtype=np.float64)
         if tool_position.shape != (3,) or not np.all(np.isfinite(tool_position)):
             raise ValueError("tool_position must contain three finite values")
         gripper_closed = float(np.clip(gripper_closed, 0.0, 1.0))
         delta = tool_position - np.asarray(self.task.p0, dtype=np.float64)
+        rotation_delta = np.zeros(3, dtype=np.float64)
+        if tool_rotation is not None:
+            tool_rotation = np.asarray(tool_rotation, dtype=np.float64)
+            if tool_rotation.shape != (3, 3) or not np.all(
+                np.isfinite(tool_rotation)
+            ):
+                raise ValueError("tool_rotation must be a finite 3x3 matrix")
+            rotation_delta = _rotation_to_rpy(self.task.R0.T @ tool_rotation)
         self.task.action_type = "eef_pose"
         self.task.step(
             np.concatenate(
-                [delta, np.zeros(3, dtype=np.float64), [gripper_closed]]
+                [delta, rotation_delta, [gripper_closed]]
             )
         )
         raw_joint_target = np.asarray(self.task.compute_q, dtype=np.float64)

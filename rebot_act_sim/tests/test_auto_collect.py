@@ -1,6 +1,6 @@
 import pytest
 
-from rebot_act_sim.workflow.collect import _smoothstep, build_argparser
+from rebot_act_sim.workflow.collect import _AutoCollector, _smoothstep, build_argparser
 
 
 def test_auto_collect_arguments() -> None:
@@ -9,7 +9,12 @@ def test_auto_collect_arguments() -> None:
     )
     assert args.auto_collect is True
     assert args.auto_speed == pytest.approx(1.2)
+    assert args.warmup_seconds == pytest.approx(1.0)
     assert args.episodes == 3
+
+
+def test_auto_collect_uses_elevated_suspended_release() -> None:
+    assert _AutoCollector.RELEASE_CLEARANCE == pytest.approx(0.045)
 
 
 @pytest.mark.parametrize(
