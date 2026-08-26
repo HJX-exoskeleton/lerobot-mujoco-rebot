@@ -425,6 +425,46 @@ rebot_act_sim/ckpt/act_sim_red_cube/
 python -m rebot_act_sim.workflow.deploy
 ```
 
+部署默认执行 **50 次**独立随机 rollout，并统计任务成功率。每次 rollout 都会
+重新随机方块位置、重置 ACT 的 action queue/temporal ensemble 状态，并最多执行
+1500 个 policy step。单次快速验证可使用：
+
+```bash
+python -m rebot_act_sim.workflow.deploy --num-rollouts 1
+```
+
+`--inference-count` 是 `--num-rollouts` 的等价别名。若显式传入 `--seed 0`，第
+`i` 次 rollout 使用 seed `i-1`，便于完整复现实验；不传 seed 时每回合均使用
+独立随机布局。
+
+验证文件默认保存在 checkpoint 上一级目录：
+
+```text
+<checkpoint parent>/deploy_evaluations/<timestamp>/
+├── summary.json                 # 总成功率、成功/失败数和各回合结果
+├── rollouts.csv                 # 便于表格统计的逐回合摘要
+├── rollout_001/
+│   ├── cameras.mp4              # 顶部与腕部相机并排视频
+│   ├── result.json              # 本回合 seed、位置、步数、接触与结果
+│   ├── arm_joints.png           # 六关节实测值与策略目标
+│   ├── gripper.png              # 夹爪位置、速度与策略目标
+│   ├── imu.png                  # 四元数、角速度、加速度
+│   ├── tactile.png              # 左右触觉强度与高亮中心统计
+│   ├── object_motion.png        # 物体位置、线速度、角速度
+│   └── tool_motion.png          # 末端位置与姿态
+└── rollout_002/ ...
+```
+
+不会保存 `motion_data.npz`。可指定输出目录或关闭视频编码：
+
+```bash
+python -m rebot_act_sim.workflow.deploy \
+  --num-rollouts 50 \
+  --output-dir outputs/rebot_act_eval/run_001
+
+python -m rebot_act_sim.workflow.deploy --no-save-video
+```
+
 部署默认在每次启动时从配置的 X/Y 范围内重新随机物体位置，并在启动日志的
 `[DEPLOY RESET]` 中输出实际坐标。需要复现实验时才显式传入非负 seed，例如
 `--seed 0`；同一个 seed 始终产生相同布局，`--seed -1` 与省略参数等价。
