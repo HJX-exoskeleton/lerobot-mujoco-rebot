@@ -258,7 +258,15 @@ class SensorVisualizer:
         )
         panel[40:390, 0:470] = high
         panel[40:390, 480:950] = wrist
-        cv2.putText(panel, "cam_high / Astra-S", (8, 27), 0, 0.62, (80, 220, 255), 2)
+        cv2.putText(
+            panel,
+            "cam_high / Gemini 336L",
+            (8, 27),
+            0,
+            0.62,
+            (80, 220, 255),
+            2,
+        )
         cv2.putText(panel, "cam_wrist / D405", (488, 27), 0, 0.62, (80, 220, 255), 2)
 
         tactile = np.clip(data.tactile[index], 0.0, 1.0)

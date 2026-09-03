@@ -51,6 +51,7 @@ from rebot_act_real.multimodal_policy import (
     is_multimodal_checkpoint,
     load_multimodal_spec,
 )
+from rebot_act_real.cameras import ThreadedGemini336LCamera
 from rebot_act_real.realtime_sensors import RealTimeMultimodalSensors
 from rebot_act_real.realtime_inference import InferenceResult, LatestInferenceWorker
 from rebot_act_real.multimodal_visualization import (
@@ -596,7 +597,7 @@ def main() -> None:
     execute = bool(args.execute)
     step = 0
     try:
-        cameras["cam_high"] = camera_hw.ThreadedAstraSCamera(name="cam_high")
+        cameras["cam_high"] = ThreadedGemini336LCamera(name="cam_high")
         cameras["cam_wrist"] = camera_hw.ThreadedRealSenseCamera(name="cam_wrist")
         sensors = RealTimeMultimodalSensors(
             use_imu=args.imu,

@@ -20,7 +20,7 @@ job_name: act_rebot_real_banana_chunk50
 resume: false
 seed: 42
 num_workers: 8
-steps: 20_000
+steps: 10_000
 eval_freq: -1
 log_freq: 50
 save_freq: 5_000

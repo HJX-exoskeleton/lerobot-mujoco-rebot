@@ -59,6 +59,7 @@ from tqdm import tqdm
 
 from rebot_scripts.Servo_control import record_rebot_episodes as hw
 from rebot_act_real.contracts import CameraSample, RobotFeedback, RobotTarget
+from rebot_act_real.cameras import ThreadedGemini336LCamera
 from rebot_act_real.dataset_writer import (
     RealACTDatasetWriter,
     overwrite_lerobot_dataset,
@@ -791,7 +792,7 @@ def main() -> None:
     )
 
     cameras: dict[str, Any] = {
-        "cam_high": hw.ThreadedAstraSCamera(name="cam_high"),
+        "cam_high": ThreadedGemini336LCamera(name="cam_high"),
         "cam_wrist": hw.ThreadedRealSenseCamera(name="cam_wrist"),
     }
     imu_reader = None if args.no_imu else hw.ThreadedYbImuReader(

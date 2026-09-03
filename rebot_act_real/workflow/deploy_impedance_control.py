@@ -47,6 +47,7 @@ from lerobot.configs.policies import PreTrainedConfig
 
 from rebot_scripts.Servo_control import record_rebot_episodes as camera_hw
 from rebot_scripts.Servo_control import replay_rebot_episodes as robot_hw
+from rebot_act_real.cameras import ThreadedGemini336LCamera
 from rebot_act_real.multimodal_policy import (
     MultimodalACTPolicy,
     is_multimodal_checkpoint,
@@ -793,7 +794,7 @@ def main() -> None:
         )
     q_cmd: np.ndarray | None = None
     try:
-        cameras["cam_high"] = camera_hw.ThreadedAstraSCamera(name="cam_high")
+        cameras["cam_high"] = ThreadedGemini336LCamera(name="cam_high")
         cameras["cam_wrist"] = camera_hw.ThreadedRealSenseCamera(name="cam_wrist")
         sensors = RealTimeMultimodalSensors(
             use_imu=args.imu,

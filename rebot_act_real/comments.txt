@@ -86,6 +86,9 @@ python -m rebot_act_real.workflow.train --imu --tactile --check-only
 普通ACT多模态可视化(IMU+触觉)：
 python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_imu_tactile/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble --temporal-ensemble-coeff 0.01 --imu --tactile --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --sensor-ready-timeout-s 30 --visualize --yes
 
+普通ACT多模态可视化(触觉)：
+python -m rebot_act_real.workflow.deploy --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_tactile/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble --temporal-ensemble-coeff 0.01 --tactile --tactile-port /dev/ttyUSB2 --sensor-ready-timeout-s 30 --visualize --yes
+
 MIT阻抗IMU+触觉真机部署：
 python -m rebot_act_real.workflow.deploy_impedance_control --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_imu_tactile/checkpoints/last/pretrained_model --dataset-root ./data_act_real/rebot_act_banana --repo-id rebot_real/rebot_act_banana --execute --rate 50 --temporal-ensemble-coeff 0.01 --imu --tactile --imu-port /dev/ttyUSB1 --tactile-port /dev/ttyUSB2 --sensor-ready-timeout-s 30 --mit-kp 16 16 16 12 12 12 --mit-kd 0.1 0.3 0.3 0.3 0.1 0.1 --mit-kp-ramp-sec 0 --accel-limit --max-accel 2 2 2 3 3 3 --visualize --yes
 

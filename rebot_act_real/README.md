@@ -36,7 +36,7 @@
 `rebot_smolvla_real` 已验证的真机能力将作为实现参考：
 
 - 50Hz主从机械臂控制与采样；
-- Astra S场景相机和RealSense腕部相机；
+- Gemini 336L场景相机（仅RGB）和RealSense腕部相机；
 - 六关节反馈、七维绝对动作和达妙夹爪；
 - 主手舵机到真机关节的标定与映射；
 - 非阻塞相机、传感器读取和异步LeRobot写入；
@@ -714,6 +714,17 @@ python -m rebot_act_real.workflow.deploy_impedance_control \
   --dataset-root ./data_act_real/rebot_act_banana \
   --repo-id rebot_real/rebot_act_banana \
   --imu --imu-port /dev/ttyUSB1 \
+  --execute --rate 50 --temporal-ensemble-coeff 0.01 \
+  --mit-kp 16 16 16 12 12 12 --mit-kd 0.1 0.3 0.3 0.2 0.1 0.1 \
+  --mit-kp-ramp-sec 0 --accel-limit --max-accel 2 2 2 3 3 3 \
+  --visualize --yes
+
+# 触觉 checkpoint
+python -m rebot_act_real.workflow.deploy_impedance_control \
+  --checkpoint rebot_act_real/ckpt/act_rebot_real_banana_chunk50_tactile/checkpoints/last/pretrained_model \
+  --dataset-root ./data_act_real/rebot_act_banana \
+  --repo-id rebot_real/rebot_act_banana \
+  --tactile --tactile-port /dev/ttyUSB2 \
   --execute --rate 50 --temporal-ensemble-coeff 0.01 \
   --mit-kp 16 16 16 12 12 12 --mit-kd 0.1 0.3 0.3 0.2 0.1 0.1 \
   --mit-kp-ramp-sec 0 --accel-limit --max-accel 2 2 2 3 3 3 \
